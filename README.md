@@ -1,5 +1,7 @@
 # Scope Navigator
 
+> **Schema source of truth:** `db/schema.sql` is currently the authoritative schema for this repo. It was generated from the live Supabase catalogue after the migration tool became unavailable in this session. When the migration tool is restored, `db/schema.sql` must be replayed through it so `supabase/migrations/` becomes the source of truth again. Do not assume migrations exist until that is done.
+
 ScopeGuard — Complete Project Brief
 
 For: Lovable planning agent Product: Scope gap and trade allocation analysis for UK construction drawings Suite: instructSite. Standalone product, later an instructSiteEnterprise add-on. Version: 2.0 — architecture validated against real project drawings
