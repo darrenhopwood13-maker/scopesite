@@ -170,14 +170,15 @@ function DrawingPage() {
 
   const knownPrefixes = new Set((prefixes.data ?? []).map((p) => p.prefix.toUpperCase()));
 
-  const correct = async (id: string, patch: Record<string, unknown>) => {
+  const correct = async (ids: string[], patch: Record<string, unknown>) => {
     const { data: session } = await supabase.auth.getUser();
     await supabase
       .from("drawing_items")
       .update({ ...patch, corrected_at: new Date().toISOString(), corrected_by: session.user?.id } as never)
-      .eq("id", id);
+      .in("id", ids);
     await items.refetch();
   };
+
 
   const teachPrefix = async (prefix: string, tradeCode: string) => {
     if (!drawing.data) return;
@@ -361,20 +362,24 @@ function DrawingPage() {
             </p>
           ) : null}
 
-          {(tab === "contested" ? contested : tab === "clear" ? clear : unclaimed).map((i) => (
+          {groupByText(tab === "contested" ? contested : tab === "clear" ? clear : unclaimed).map((g) => (
             <AllocationRow
-              key={i.id}
-              item={i}
+              key={g.item.id}
+              item={g.item}
+              ids={g.ids}
+              occurrences={g.ids.length}
               trades={trades.data ?? []}
               unknownPrefix={
-                i.system_code && !knownPrefixes.has(String(i.system_code).split("-")[0]!.toUpperCase())
-                  ? String(i.system_code).split("-")[0]!.toUpperCase()
+                g.item.system_code &&
+                !knownPrefixes.has(String(g.item.system_code).split("-")[0]!.toUpperCase())
+                  ? String(g.item.system_code).split("-")[0]!.toUpperCase()
                   : null
               }
               onCorrect={correct}
               onTeachPrefix={teachPrefix}
             />
           ))}
+
         </section>
       ) : null}
 
@@ -390,17 +395,34 @@ function DrawingPage() {
   );
 }
 
+/** Identical text at two places on the sheet reads as a duplicate row until
+ * the viewer can show where each one sits, so it is shown once with a count. */
+function groupByText(list: Item[]): Array<{ item: Item; ids: string[] }> {
+  const groups = new Map<string, { item: Item; ids: string[] }>();
+  for (const i of list) {
+    const key = i.raw_text.trim().toLowerCase();
+    const g = groups.get(key);
+    if (g) g.ids.push(i.id);
+    else groups.set(key, { item: i, ids: [i.id] });
+  }
+  return [...groups.values()];
+}
+
 function AllocationRow({
   item,
+  ids,
+  occurrences,
   trades,
   unknownPrefix,
   onCorrect,
   onTeachPrefix,
 }: {
   item: Item;
+  ids: string[];
+  occurrences: number;
   trades: Array<{ code: string; name: string }>;
   unknownPrefix: string | null;
-  onCorrect: (id: string, patch: Record<string, unknown>) => Promise<void>;
+  onCorrect: (ids: string[], patch: Record<string, unknown>) => Promise<void>;
   onTeachPrefix: (prefix: string, tradeCode: string) => Promise<void>;
 }) {
   const [note, setNote] = useState("");
@@ -418,6 +440,9 @@ function AllocationRow({
         {item.system_code ? <span className="text-muted-foreground">{item.system_code}</span> : null}
         {item.item_type === ITEM_TYPE.deferral ? (
           <span className="text-severity-medium">Also a deferral</span>
+        ) : null}
+        {occurrences > 1 ? (
+          <span className="text-muted-foreground">Appears {occurrences} times on this sheet</span>
         ) : null}
         {item.correction_status ? (
           <span className="text-muted-foreground">You marked this {item.correction_status}</span>
@@ -464,7 +489,7 @@ function AllocationRow({
           className="rounded-md border border-border bg-background px-2 py-1"
           value={effectiveTrade(item) ?? ""}
           onChange={(e) =>
-            onCorrect(item.id, {
+            onCorrect(ids, {
               corrected_trade_code: e.target.value || null,
               correction_status: e.target.value ? "changed" : null,
             })
@@ -479,7 +504,7 @@ function AllocationRow({
         </select>
         <button
           onClick={() =>
-            onCorrect(item.id, {
+            onCorrect(ids, {
               correction_status: "accepted",
               corrected_trade_code: effectiveTrade(item),
             })
@@ -506,7 +531,7 @@ function AllocationRow({
           />
           <button
             onClick={async () => {
-              await onCorrect(item.id, { correction_status: "dismissed", correction_note: note });
+              await onCorrect(ids, { correction_status: "dismissed", correction_note: note });
               setShowNote(false);
             }}
             className="rounded-md bg-accent px-3 py-1 font-medium text-accent-foreground"
