@@ -2,9 +2,13 @@
 
 Staged exactly as the brief sets out. Each phase ships and is checked against the two Grafton Street drawings before the next one starts. Nothing from a later phase is built early.
 
-## Before Phase 1 — connect your own backend
+## Before Phase 1 — two things needed from you
 
-The brief requires your own Supabase Pro project, not a managed Lovable backend. I cannot link it from this chat: you connect it yourself in Lovable under Project Settings → Connectors → Supabase (a browser sign-in). Once it is connected I will:
+1. Connect your own Supabase Pro project. I cannot link it from this chat: you connect it in Lovable under Project Settings → Connectors → Supabase (a browser sign-in).
+2. Upload the two Grafton Street PDFs. The rotation proof and the acceptance check both need the real sheets.
+
+Once the project is connected I will:
+
 
 - create the private `drawings` storage bucket,
 - apply the full schema as a migration, and the seed data as a separate migration,
