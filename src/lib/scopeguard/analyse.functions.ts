@@ -110,6 +110,9 @@ export const analyseDrawing = createServerFn({ method: "POST" })
         cues: (cues ?? []) as TradeCue[],
         prefixes: (prefixes ?? []) as CodePrefix[],
         rules: (rules ?? []) as InterfaceRule[],
+        // The junction context is the whole sheet, not one annotation.
+        sheetContext: extract.items.map((i) => i.item.str).join(" "),
+
       };
 
 
