@@ -198,7 +198,31 @@ function valueUnder(lines: TbLine[], label: RegExp): string | null {
   return null;
 }
 
-export function parseTitleblock(lines: TbLine[]): Titleblock {
+// Revision history table: a short revision code with a date on the same
+// baseline, to its right. Returns one entry per row found.
+function revisionRows(lines: TbLine[]): Array<{ rev: string; date: string }> {
+  const rows: Array<{ rev: string; date: string }> = [];
+  const codes = lines.filter((l) => /^(P\d{2}|C\d{2}|[A-Z]?\d{1,2})$/i.test(l.str.trim()));
+  for (const code of codes) {
+    const right = lines
+      .filter(
+        (l) =>
+          l !== code &&
+          Math.abs(l.y - code.y) <= 3 &&
+          l.x > code.x &&
+          l.x - code.x < 120 &&
+          /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/.test(l.str.trim()),
+      )
+      .sort((a, b) => a.x - b.x)[0];
+    if (!right) continue;
+    const date = right.str.trim().match(/^(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/)?.[1];
+    if (date) rows.push({ rev: code.str.trim().toUpperCase(), date });
+  }
+  return rows;
+}
+
+export function parseTitleblock(lines: TbLine[], revisionScanLines?: TbLine[]): Titleblock {
+
   const clean = lines
     .map((l) => ({ ...l, str: l.str.trim() }))
     .filter((l) => l.str.length > 0);
@@ -228,10 +252,22 @@ export function parseTitleblock(lines: TbLine[]): Titleblock {
     joined.match(/\b(P\d{2})\b/);
   if (rev?.[1]) tb.revision = rev[1].toUpperCase();
 
-  const dateValue =
-    valueUnder(clean, /^date$/i) ?? valueUnder(clean, /first issue date/i);
-  const date = (dateValue ?? joined).match(/\b(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\b/);
-  if (date?.[1]) tb.drawing_date = date[1];
+  // Revision history rows: "<rev>  <date>  <description>" on one baseline.
+  // The sheet date is the date of the CURRENT revision, never the first row.
+  const revRows = revisionRows(revisionScanLines ?? clean);
+  const currentRow = tb.revision
+    ? revRows.find((r) => r.rev === tb.revision)
+    : revRows.slice().sort((a, b) => b.rev.localeCompare(a.rev))[0];
+  if (currentRow) {
+    tb.drawing_date = currentRow.date;
+    if (!tb.revision) tb.revision = currentRow.rev;
+  } else {
+    const dateValue =
+      valueUnder(clean, /^date$/i) ?? valueUnder(clean, /first issue date/i);
+    const date = (dateValue ?? joined).match(/\b(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\b/);
+    if (date?.[1]) tb.drawing_date = date[1];
+  }
+
 
   const scaleValue = valueUnder(clean, /^scale\b.*$/i);
   tb.drawing_scale = scaleValue ?? joined.match(/\b1\s*[:/]\s*\d{1,4}(?:\s*@\s*A\d)?/i)?.[0] ?? null;
@@ -304,12 +340,23 @@ export function isRedish(hex: string): boolean {
 // A merged notes block can hold a whole general-notes list. Findings must quote
 // one note, so split a block into sentences and test each one.
 export function splitNotes(text: string): string[] {
-  const parts = text
+  const raw = text
     .split(/(?<=[.;])\s+(?=[A-Z0-9])/)
     .map((s) => s.trim())
-    .filter((s) => s.length >= 8);
-  return parts.length ? parts : [text.trim()];
+    .filter((s) => s.length > 0);
+  // A full stop mid-annotation ("... CLADDING SPECIALIST. IN ABEYANCE") is not
+  // a note boundary. Only treat a fragment as its own note if it reads like a
+  // sentence in its own right; otherwise fold it back into the previous note.
+  const parts: string[] = [];
+  for (const p of raw) {
+    const standalone = p.length >= 30 && p.split(/\s+/).length >= 5;
+    if (!standalone && parts.length) parts[parts.length - 1] += ` ${p}`;
+    else parts.push(p);
+  }
+  const kept = parts.filter((s) => s.length >= 8);
+  return kept.length ? kept : [text.trim()];
 }
+
 
 export function detectDeferrals(
   items: Array<{ item: MergedItem; region: Region }>,
