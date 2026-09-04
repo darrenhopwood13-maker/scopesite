@@ -262,21 +262,28 @@ export function parseTitleblock(lines: TbLine[], revisionScanLines?: TbLine[]): 
     joined.match(/\b(P\d{2})\b/);
   if (rev?.[1]) tb.revision = rev[1].toUpperCase();
 
-  // Revision history rows: "<rev>  <date>  <description>" on one baseline.
-  // The sheet date is the date of the CURRENT revision, never the first row.
+  // Date order: the titleblock's own date field first (that is the date printed
+  // on the sheet), then the revision history row for the CURRENT revision —
+  // never the first row of the history, and never a "first issue" date while a
+  // current-revision row exists.
   const revRows = revisionRows(revisionScanLines ?? clean);
   const currentRow = tb.revision
     ? revRows.find((r) => r.rev === tb.revision)
     : revRows.slice().sort((a, b) => b.rev.localeCompare(a.rev))[0];
-  if (currentRow) {
-    tb.drawing_date = currentRow.date;
-    if (!tb.revision) tb.revision = currentRow.rev;
-  } else {
-    const dateValue =
-      valueUnder(clean, /^date$/i) ?? valueUnder(clean, /first issue date/i);
+
+  const dateField = valueUnder(clean, /^date$/i)?.match(
+    /\b(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\b/,
+  )?.[1];
+
+  if (dateField) tb.drawing_date = dateField;
+  else if (currentRow) tb.drawing_date = currentRow.date;
+  else {
+    const dateValue = valueUnder(clean, /first issue date/i);
     const date = (dateValue ?? joined).match(/\b(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\b/);
     if (date?.[1]) tb.drawing_date = date[1];
   }
+  if (currentRow && !tb.revision) tb.revision = currentRow.rev;
+
 
 
   const scaleValue = valueUnder(clean, /^scale\b.*$/i);
