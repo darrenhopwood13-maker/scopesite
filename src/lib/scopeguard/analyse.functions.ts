@@ -196,12 +196,35 @@ export const analyseDrawing = createServerFn({ method: "POST" })
           };
         });
 
-      if (others.length) {
-        const { error } = await supabase.from("drawing_items").insert(others as never);
-        if (error) return await fail(`Could not record the sheet's annotations: ${error.message}`);
-      }
+      // The new set is complete: now, and only now, replace the old findings.
+      await replaceItems([...deferralRows, ...others]);
 
-
+      const { error: metaError } = await supabase
+        .from("drawings")
+        .update({
+          triage_class: extract.triage_class,
+          text_span_count: extract.text_span_count,
+          body_text_count: extract.body_text_count,
+          path_count: extract.path_count,
+          layers_present: extract.layers_present,
+          page_width: extract.page_width,
+          page_height: extract.page_height,
+          page_rotation: extract.page_rotation,
+          coordinate_frame_ok: extract.coordinate_frame_ok,
+          notes_strip_source: extract.notes_strip_source,
+          drawing_number: extract.titleblock.drawing_number,
+          revision: extract.titleblock.revision,
+          drawing_date: extract.titleblock.drawing_date,
+          drawing_scale: extract.titleblock.drawing_scale,
+          title: extract.titleblock.title,
+          drawing_client: extract.titleblock.drawing_client,
+          originator: extract.titleblock.originator,
+          issue_status: extract.titleblock.issue_status,
+          drawing_type: extract.titleblock.drawing_type,
+          discipline_code: extract.titleblock.discipline_code,
+        })
+        .eq("id", drawing.id);
+      if (metaError) return await fail(`Could not record the drawing details: ${metaError.message}`);
 
       const { error: doneError } = await supabase
         .from("drawings")
@@ -212,8 +235,8 @@ export const analyseDrawing = createServerFn({ method: "POST" })
       return { status: DRAWING_STATUS.complete, cloned: false, items: findings.length };
 
     } catch (error) {
-      // Fail closed: status failed, error recorded, no partial findings kept.
-      await supabase.from("drawing_items").delete().eq("drawing_id", drawing.id);
+      // Fail closed: status failed and the error recorded, but the previous
+      // findings are left exactly as they were.
       return await fail(error instanceof Error ? error.message : String(error));
     }
   });
