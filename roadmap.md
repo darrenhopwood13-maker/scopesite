@@ -13,7 +13,7 @@
 - [ ] Magic-link auth wired
 - [ ] Projects list + create
 - [ ] Drawing upload (multi-PDF, hash dedupe; same hash in same project clones items and skips analysis, different project analyses normally)
-- [ ] `analyse-drawing`: rotation normalisation, coordinate-frame proof, titleblock-border notes strip, line merging, annotation-filtered triage + vector path count, diagnostics (text_span_count, body_text_count, path_count, layers_present), titleblock parse incl. drawing_type/discipline_code, deferral detection, colour flags, fail-closed
+- [ ] `analyse-drawing`: owner_id + project_id copied from the parent drawing row on EVERY insert (drawing_items, coverage, corroborations) — service role bypasses RLS, not-null is only the safety net; rotation normalisation, coordinate-frame proof, titleblock-border notes strip, line merging, annotation-filtered triage + vector path count, diagnostics (text_span_count, body_text_count, path_count, layers_present), titleblock parse incl. drawing_type/discipline_code, deferral detection, colour flags, fail-closed
 - [ ] Deferrals screen with disclaimer
 - [ ] Excel export of deferrals
 - [ ] Acceptance check on both sheets (deferrals AND triage class) — then stop
