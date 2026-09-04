@@ -92,6 +92,25 @@ export const analyseDrawing = createServerFn({ method: "POST" })
 
       const findings = detectDeferrals(extract.items, (patterns ?? []) as DeferralPattern[]);
 
+      // Stages 5-7 run in the same pass: reading and allocating are one step.
+      const [{ data: cues }, { data: prefixes }, { data: rules }] = await Promise.all([
+        supabase.from("trade_cues").select("trade_code, cue, weight"),
+        supabase
+          .from("system_code_prefixes")
+          .select("prefix, trade_code, scope, project_id")
+          .or(`scope.eq.global,project_id.eq.${drawing.project_id}`),
+        supabase
+          .from("interface_rules")
+          .select("id, name, trigger_terms, context_terms, trade_codes, severity, guidance"),
+      ]);
+
+      const reference = {
+        cues: (cues ?? []) as TradeCue[],
+        prefixes: (prefixes ?? []) as CodePrefix[],
+        rules: (rules ?? []) as InterfaceRule[],
+      };
+
+
       // Write what the sheet says about itself first, so the titleblock and
       // triage survive even if recording the findings fails.
       const { error: metaError } = await supabase
