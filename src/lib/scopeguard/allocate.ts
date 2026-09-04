@@ -61,8 +61,13 @@ function matchRule(text: string, sheetContext: string, rules: InterfaceRule[]): 
   // be in the item; the context may come from anywhere on the sheet.
   const context = ` ${sheetContext.toLowerCase().replace(/[^a-z0-9]+/g, " ")} `;
   const norm = (term: string) => ` ${term.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()} `;
-  const inItem = (term: string) => hay.includes(norm(term));
-  const inSheet = (term: string) => context.includes(norm(term));
+  // Tolerate a simple plural: sheets write "upstands" where the rule says "upstand".
+  const forms = (term: string) => {
+    const n = norm(term);
+    return [n, `${n.trimEnd()}s `, `${n.trimEnd()}es `];
+  };
+  const inItem = (term: string) => forms(term).some((f) => hay.includes(f));
+  const inSheet = (term: string) => forms(term).some((f) => context.includes(f));
   for (const r of rules) {
     if (!r.trigger_terms?.some(inItem)) continue;
     if (r.context_terms?.length && !r.context_terms.some((t) => inItem(t) || inSheet(t))) continue;
