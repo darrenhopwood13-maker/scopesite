@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Wordmark } from "@/components/Wordmark";
 import { Disclaimer } from "@/components/Disclaimer";
 
@@ -65,11 +65,14 @@ function Index() {
         </p>
 
         <div className="mt-10 flex flex-wrap items-center gap-4">
-          <span className="cursor-not-allowed rounded-sm bg-primary/40 px-5 py-3 text-sm font-medium text-primary-foreground">
+          <Link
+            to="/auth"
+            className="rounded-sm bg-primary px-5 py-3 text-sm font-medium text-primary-foreground hover:opacity-90"
+          >
             Sign in
-          </span>
+          </Link>
           <span className="font-mono text-xs uppercase tracking-[0.16em] text-accent">
-            Awaiting backend connection
+            Phase 1 — deferrals register
           </span>
         </div>
 
