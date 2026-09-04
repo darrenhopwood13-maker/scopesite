@@ -217,7 +217,7 @@ export function parseTitleblock(lines: TbLine[]): Titleblock {
   };
 
   const numLabel = valueUnder(clean, /^drawing\s*(no\.?|number)$/i);
-  const numText = (numLabel ?? joined).replace(/(?<=[A-Z0-9])[ ]+(?=[A-Z0-9-])/g, "");
+  const numText = (numLabel ?? joined).replace(/(?<=[A-Z0-9-])[ ]+(?=[A-Z0-9-])/g, "");
   const num = numText.match(DRAWING_NUMBER);
   if (num) tb.drawing_number = num[0].replace(/^-|-$/g, "");
 
@@ -239,7 +239,6 @@ export function parseTitleblock(lines: TbLine[]): Titleblock {
   const statusValue =
     valueUnder(clean, /^(purpose of issue|status|suitability)$/i) ??
     joined.match(/\b(S[0-7]|A[1-5])\s*[-–]\s*[A-Za-z ]{3,40}/)?.[0] ??
-    joined.match(STATUS_CODE)?.[0] ??
     null;
   if (statusValue) tb.issue_status = statusValue.trim();
 
@@ -248,7 +247,7 @@ export function parseTitleblock(lines: TbLine[]): Titleblock {
 
   const orig = joined.match(/\b(Foster\s?\+\s?Partners|Veretec)\b/i);
   if (orig) {
-    tb.originator = orig[0];
+    tb.originator = /veretec/i.test(orig[0]) ? "Veretec" : "Foster + Partners";
   } else {
     const copy = joined.match(/©\s*(?:copyright)?\s*[-–]?\s*([A-Za-z'&+. -]{3,40})/i);
     if (copy?.[1]) tb.originator = copy[1].trim();
@@ -275,12 +274,13 @@ export function parseTitleblock(lines: TbLine[]): Titleblock {
 /* Deferral detection                                                  */
 /* ------------------------------------------------------------------ */
 
-const PARTY_AFTER =
-  /(?:reviewed with|review by|confirmed by|designed by|determined by|defined by|provided by|by|with|to)\s+((?:the\s+)?(?:appointed\s+|nominated\s+|specialist\s+)?[A-Za-z'&/+ -]{4,60}?)(?:\.|,|;|$)/i;
+const PARTY_PHRASES =
+  /(?:reviewed with|review by|reviewed by|confirmed by|designed by|determined by|defined by|provided by|carried out by|installed by|by)\s+((?:the\s+)?(?:appointed\s+|nominated\s+)?[A-Za-z'&/+ -]{4,60}?)(?:\.|,|;|$)/i;
+const PARTY_FALLBACK = /\b(?:with|to)\s+((?:the\s+)?[A-Za-z'&/+ -]{4,60}?)(?:\.|,|;|$)/i;
 
 export function extractDeferredTo(text: string): string | null {
   if (/\bby others\b/i.test(text)) return null;
-  const m = text.match(PARTY_AFTER);
+  const m = text.match(PARTY_PHRASES) ?? text.match(PARTY_FALLBACK);
   if (!m?.[1]) return null;
   const party = m[1].trim().replace(/\s+/g, " ");
   if (party.length < 4) return null;
@@ -367,7 +367,7 @@ export function detectDeferrals(
     if (region === "titleblock") continue;
     const text = item.str.trim();
     if (text.length < 8 || !isRedish(item.colour)) continue;
-    if (findings.some((f) => f.raw_text === text)) continue;
+    if (findings.some((f) => text.includes(f.raw_text) || f.raw_text.includes(text))) continue;
     findings.push({
       raw_text: text,
       region,
