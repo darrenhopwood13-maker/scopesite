@@ -1,40 +1,38 @@
-# Phase 2 — Allocation, plus the drawing viewer
+# Fix the failed reads and stop failures wiping good findings
 
-Two pieces of work, in this order: get allocation working, then build the viewer that lets you see each finding on the sheet.
+Both sheets currently fail with a PDF worker error and end up with zero findings. Two separate fixes, then a re-run of both sheets before any viewer work.
 
-## Part A — Allocation
+## 1. Make the PDF reader work in the deployed environment
 
-**System code matching.** Each finding's text is checked against the project's prefix register (the ten global prefixes plus any this project has learned). When a code prefix appears that the register does not know, the row shows a "new prefix found — what does this mean?" prompt; answering it saves the prefix for this project only, never globally.
+The reader runs on the server. Nothing in the code tells the PDF library where its worker script lives, so it falls back to loading one by guessing a path — that guess does not exist in the deployed bundle, which is the `No such module '_libs/pdf.worker.mjs'` error.
 
-**Cue scoring.** The validated cue list from the brief scores candidate trades for each finding. A clear winner allocates; two or more close scores land in a contested band; nothing scoring lands unclaimed. No invented cues.
+Fix in `src/lib/scopeguard/extract.server.ts`:
 
-**Interface rules.** The fifteen seeded interface rules always override a confident single allocation, so junction work never collapses to one trade.
+- Import the worker module explicitly (`pdfjs-dist/legacy/build/pdf.worker.mjs`) so the bundler includes it in the deployed output instead of resolving it at runtime.
+- Hand that module to pdf.js before opening a document by assigning it to `globalThis.pdfjsWorker` and setting `GlobalWorkerOptions.workerSrc` to a non-empty value, so the library uses the already-bundled worker and never attempts a runtime path lookup.
+- Keep this setup in a single server-only initialiser that runs once per process.
 
-**Three tabs on the drawing page** — Clear, Contested, Unclaimed — each row correctable: change trade, accept, or dismiss with a note. Every correction is stored against the finding with who made it and when.
+Server vs client: this configuration stays inside `extract.server.ts` and applies to the reader only. When the Part B viewer renders PDFs in the browser it will need its own worker setup (a bundled worker URL via `new URL(..., import.meta.url)`); the two must not share one configuration.
 
-**Acceptance:** on the Veretec sheet, cavity barrier, secondary steel, beam encasement and waterproofing upstand all come back contested, none collapsed to a single trade.
+Verification: run both sheets through the deployed preview (not just the local harness) and confirm the worker error is gone and the reader completes.
 
-## Part B — Drawing viewer
+## 2. A failed read must leave previous findings intact
 
-Built after the allocation tabs work.
+Rework `src/lib/scopeguard/analyse.functions.ts` so replacement is the last step, not the first:
 
-**Layout.** Split view on the drawing page: register left at 40%, drawing right at 60%, draggable divider whose position is remembered per user. Titleblock summary stays above both. Under 1024px wide it becomes two tabs, Findings and Drawing, rather than a cramped split.
+1. Mark the drawing as reading. Do not delete anything.
+2. Download, extract, detect deferrals, allocate — all in memory.
+3. Only once the full new set is built: delete the previous items and insert the new ones, then write the titleblock/diagnostics and the complete status.
+4. On any failure at any point: leave the existing items untouched, record the error, set status failed.
 
-**Rendering.** The sheet is drawn in the browser from a short-lived signed link to the private store — the file is never made public. Rendered once per zoom level and cached, never redrawn while panning, with a loading state on first render. Page one only; if a file has more pages, the count is stated.
+The duplicate-clone path follows the same order: build the cloned rows first, replace only on success.
 
-**The coordinate gate.** Before anything else in the viewer is built: store which frame each location belongs to (rotated or unrotated page space) alongside the page rotation and page size already held on the drawing record, then prove the transform on the Veretec 2746 sheet with one hardcoded box — the red abeyance annotation must be covered exactly, across both merged lines. Nothing further gets built until that lands on the money. Where several lines merged into one finding, the stored box is the union of those lines.
+Failure display on the drawing page keeps the existing behaviour and makes it explicit: the error banner states the read failed and produced nothing, and any findings shown below are labelled as coming from the earlier successful read.
 
-**Interactions.** Click a finding: the view eases to it over about 300ms, framed at roughly a quarter of the viewport width, clamped between fit-page and 4x, with the box filled at low opacity and outlined in its severity colour — red, amber, blue — pulsing once then steady. Hovering a row outlines its box without moving the view. Clicking the sheet inside a box selects that row and scrolls the register to it. A toggle (off by default) marks every finding's box at once with no zoom change. Wheel and pinch zoom about the cursor, drag to pan, buttons for in, out, fit page, fit width, reset, and keyboard + - 0.
+## 3. Acceptance before Part B
 
-**No location.** A finding without a stored box shows "Location not available on sheet" instead of the locate control, clicking does nothing to the view, and the occurrence is counted so a rise in them is visible.
+- Foster: 10 deferrals, `notes_only`, Rev 02 / 11/03/2024.
+- Veretec: 4 deferrals, 14 contested, 16 clear, 3 unclaimed, `annotation_rich`, Rev P01 / 11/06/25.
+- A deliberately failed read leaves the previous findings in place.
 
-**Explicitly not built, now or later:** measuring, markup or comments, revision overlay or comparison, printing, layer toggling, any editing of the file.
-
-**Acceptance:** Veretec 2746 renders upright, the red abeyance finding frames and highlights exactly, and the overlay puts every finding inside the page. Foster 0002 renders despite its very heavy linework and stays smooth, the fire specialist deferral frames note 14, and all ten findings sit in the notes strip. Veretec 2144's party wall TBC highlights on the body annotation, not the titleblock, and clicking that annotation selects its row.
-
-## Technical notes
-
-- Allocation runs server-side in a TanStack server function against the project's Supabase data; corrections written through RLS as the signed-in user.
-- Migration adds `bbox_frame` to `drawing_items` and an allocation/correction table with grants and RLS; `page_rotation`, `page_width`, `page_height` already exist on `drawings`.
-- Viewer uses the already-installed `pdfjs-dist` client-side, canvas cached per zoom, non-passive wheel listener with cursor-anchored exponential zoom.
-- Re-reading a sheet is required after the migration so boxes carry their frame.
+Part B (the drawing viewer) does not start until both sheets read cleanly.
