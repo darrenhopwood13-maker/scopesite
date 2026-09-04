@@ -103,8 +103,13 @@ export function allocate(
     .map(([trade_code, score]) => ({ trade_code, score: Math.round(score * 100) / 100 }))
     .sort((a, b) => b.score - a.score);
 
-  // An interface rule always overrides a confident single allocation.
-  const rule = matchRule(text, reference.sheetContext ?? "", reference.rules);
+  // An interface rule always overrides a confident single allocation, but only
+  // where the item itself shows work belonging to one of the rule's trades —
+  // otherwise a stray trigger word turns an unrelated note into a junction.
+  const rulesInPlay = reference.rules.filter((r) =>
+    r.trade_codes?.some((t) => scores.some((s) => s.trade_code === t && s.score > 0)),
+  );
+  const rule = matchRule(text, reference.sheetContext ?? "", rulesInPlay);
   if (rule) {
     return {
       ...base,
