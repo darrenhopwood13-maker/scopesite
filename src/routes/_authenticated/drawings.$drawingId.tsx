@@ -160,11 +160,15 @@ function DrawingPage() {
   const clear = useMemo(() => all.filter((i) => effectiveStatus(i) === "allocated"), [all]);
   const unclaimed = useMemo(() => all.filter((i) => effectiveStatus(i) === "unallocated"), [all]);
 
+  // Allocation only applies to sheets with readable body annotations.
+  const allocationApplies =
+    drawing.data?.triage_class !== "notes_only" && drawing.data?.triage_class !== "graphical_only";
+
   const tabCounts: Record<Tab, number | null> = {
     deferrals: deferrals.length,
-    contested: contested.length,
-    clear: clear.length,
-    unclaimed: unclaimed.length,
+    contested: allocationApplies ? contested.length : null,
+    clear: allocationApplies ? clear.length : null,
+    unclaimed: allocationApplies ? unclaimed.length : null,
     coverage: null,
   };
 
@@ -350,7 +354,17 @@ function DrawingPage() {
         </section>
       ) : null}
 
-      {tab === "contested" || tab === "clear" || tab === "unclaimed" ? (
+      {(tab === "contested" || tab === "clear" || tab === "unclaimed") && !allocationApplies ? (
+        <section className="space-y-4">
+          <p className="text-muted-foreground">
+            Not applicable on this sheet. It reads as{" "}
+            {drawing.data?.triage_class?.replace(/_/g, " ")}, so there are no body annotations to
+            allocate to a trade. The deferrals register is the output for this drawing.
+          </p>
+        </section>
+      ) : null}
+
+      {(tab === "contested" || tab === "clear" || tab === "unclaimed") && allocationApplies ? (
         <section className="space-y-4">
           {(tab === "contested" ? contested : tab === "clear" ? clear : unclaimed).length === 0 ? (
             <p className="text-muted-foreground">
