@@ -184,15 +184,17 @@ export const analyseDrawing = createServerFn({ method: "POST" })
         if (error) return await fail(`Could not record findings: ${error.message}`);
       }
 
-      // Every other readable annotation on the sheet is allocated too — the
-      // Clear / Contested / Unclaimed tabs cover the whole sheet, not just
-      // the deferrals. Text already carried by a deferral is not repeated.
+      // Allocation only ever runs on the body of the sheet. Titleblock text
+      // and the standard notes strip name no scope, so they never reach the
+      // Clear / Contested / Unclaimed tabs. Deferral detection still reads
+      // every region.
       const deferralText = new Set(findings.map((f) => f.raw_text.toLowerCase()));
       const others = extract.items
         .filter(({ item, region }) => {
           const t = item.str.trim();
-          if (region === "titleblock") return false;
+          if (region !== "body") return false;
           if (t.length < 8 || isAnnotationOnly(t)) return false;
+
           const lower = t.toLowerCase();
           return ![...deferralText].some((d) => d.includes(lower) || lower.includes(d));
         })
