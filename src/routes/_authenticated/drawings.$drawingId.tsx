@@ -6,6 +6,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { analyseDrawing } from "@/lib/scopeguard/analyse.functions";
 import { AccountBar } from "@/components/AccountBar";
 import { Disclaimer } from "@/components/Disclaimer";
+import { DRAWING_STATUS, ITEM_TYPE } from "@/lib/scopeguard/vocab";
+
 
 export const Route = createFileRoute("/_authenticated/drawings/$drawingId")({
   head: () => ({
@@ -63,7 +65,7 @@ function DrawingPage() {
         .from("drawing_items")
         .select("*")
         .eq("drawing_id", drawingId)
-        .eq("item_type", "deferral");
+        .eq("item_type", ITEM_TYPE.deferral);
       if (error) throw error;
       const order: Record<string, number> = { high: 0, medium: 1, low: 2 };
       return [...data].sort((a, b) => (order[a.severity ?? "low"] ?? 3) - (order[b.severity ?? "low"] ?? 3));
@@ -173,14 +175,24 @@ function DrawingPage() {
       <Disclaimer />
 
       <section className="space-y-4">
-        {d?.status === "failed" ? (
-          <p className="text-destructive">
-            This drawing could not be read: {d.error_message}. No findings were produced.
-          </p>
+        {d?.status === DRAWING_STATUS.failed ? (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-2">
+            <p className="text-destructive">
+              This drawing could not be read: {d.error_message}. No findings were produced by this
+              read.
+            </p>
+            {items.data?.length ? (
+              <p className="text-sm text-muted-foreground">
+                The {items.data.length} finding{items.data.length === 1 ? "" : "s"} below are from
+                an earlier successful read of this sheet, not from the read that just failed.
+              </p>
+            ) : null}
+          </div>
         ) : null}
-        {items.data?.length === 0 && d?.status === "complete" ? (
+        {items.data?.length === 0 && d?.status === DRAWING_STATUS.complete ? (
           <p className="text-muted-foreground">No deferrals found on this sheet.</p>
         ) : null}
+
         {items.data?.map((i) => (
           <article key={i.id} className="rounded-lg border border-border bg-card p-4 space-y-2">
             <div className="flex items-center gap-3 text-sm">

@@ -6,6 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { analyseDrawing } from "@/lib/scopeguard/analyse.functions";
 import { AccountBar } from "@/components/AccountBar";
 import { Disclaimer } from "@/components/Disclaimer";
+import { DRAWING_STATUS, DRAWING_STATUS_LABELS, type DrawingStatus } from "@/lib/scopeguard/vocab";
+
 
 export const Route = createFileRoute("/_authenticated/projects/$projectId")({
   head: () => ({
@@ -33,12 +35,9 @@ async function sha256(file: File): Promise<string> {
 }
 
 function statusLabel(status: string): string {
-  if (status === "queued") return "Queued";
-  if (status === "reading") return "Reading";
-  if (status === "complete") return "Read";
-  if (status === "failed") return "Failed";
-  return status;
+  return DRAWING_STATUS_LABELS[status as DrawingStatus] ?? status;
 }
+
 
 function ProjectPage() {
   const { projectId } = Route.useParams();
@@ -104,7 +103,7 @@ function ProjectPage() {
               file_name: file.name,
               storage_path: path,
               file_hash: hash,
-              status: "queued",
+              status: DRAWING_STATUS.queued,
             })
             .select("id")
             .single();

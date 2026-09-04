@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { detectDeferrals, type DeferralPattern } from "./pipeline";
+import { DRAWING_STATUS, ITEM_TYPE } from "./vocab";
 
 export const analyseDrawing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -25,13 +26,13 @@ export const analyseDrawing = createServerFn({ method: "POST" })
     const fail = async (message: string) => {
       await supabase
         .from("drawings")
-        .update({ status: "failed", error_message: message.slice(0, 500), analysed_at: new Date().toISOString() })
+        .update({ status: DRAWING_STATUS.failed, error_message: message.slice(0, 500), analysed_at: new Date().toISOString() })
         .eq("id", drawing.id);
-      return { status: "failed" as const, error: message, items: 0 };
+      return { status: DRAWING_STATUS.failed, error: message, items: 0 };
     };
 
     try {
-      await supabase.from("drawings").update({ status: "reading", error_message: null }).eq("id", drawing.id);
+      await supabase.from("drawings").update({ status: DRAWING_STATUS.reading, error_message: null }).eq("id", drawing.id);
       // Re-reading a sheet replaces its findings; it never adds a second set.
       await supabase.from("drawing_items").delete().eq("drawing_id", drawing.id);
 
@@ -41,7 +42,7 @@ export const analyseDrawing = createServerFn({ method: "POST" })
         .select("id, triage_class, text_span_count, body_text_count, path_count, layers_present, page_width, page_height, page_rotation, coordinate_frame_ok, notes_strip_source, drawing_number, revision, drawing_date, drawing_scale, title, drawing_client, originator, issue_status, drawing_type, discipline_code")
         .eq("project_id", drawing.project_id)
         .eq("file_hash", drawing.file_hash)
-        .eq("status", "complete")
+        .eq("status", DRAWING_STATUS.complete)
         .neq("id", drawing.id)
         .limit(1)
         .maybeSingle();
@@ -64,13 +65,13 @@ export const analyseDrawing = createServerFn({ method: "POST" })
           .from("drawings")
           .update({
             ...twinFields,
-            status: "complete",
+            status: DRAWING_STATUS.complete,
             cloned_from_drawing_id: twin.id,
             analysed_at: new Date().toISOString(),
           })
           .eq("id", drawing.id);
 
-        return { status: "complete" as const, cloned: true, items: twinItems?.length ?? 0 };
+        return { status: DRAWING_STATUS.complete, cloned: true, items: twinItems?.length ?? 0 };
       }
 
       const { data: file, error: fileError } = await supabase.storage
@@ -121,7 +122,7 @@ export const analyseDrawing = createServerFn({ method: "POST" })
         const { error } = await supabase.from("drawing_items").insert(
           findings.map((f) => ({
             ...stamp,
-            item_type: "deferral",
+            item_type: ITEM_TYPE.deferral,
             raw_text: f.raw_text,
             region: f.region,
             page_number: 1,
@@ -143,11 +144,11 @@ export const analyseDrawing = createServerFn({ method: "POST" })
 
       const { error: doneError } = await supabase
         .from("drawings")
-        .update({ status: "complete", error_message: null, analysed_at: new Date().toISOString() })
+        .update({ status: DRAWING_STATUS.complete, error_message: null, analysed_at: new Date().toISOString() })
         .eq("id", drawing.id);
       if (doneError) return await fail(`Could not finish the reading: ${doneError.message}`);
 
-      return { status: "complete" as const, cloned: false, items: findings.length };
+      return { status: DRAWING_STATUS.complete, cloned: false, items: findings.length };
 
     } catch (error) {
       // Fail closed: status failed, error recorded, no partial findings kept.
