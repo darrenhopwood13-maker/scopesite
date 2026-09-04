@@ -359,6 +359,14 @@ const LEADING_NOISE =
 const STAGE_NAMES =
   /^(?:tenant\s+fit[- ]?out|fit[- ]?out|base\s+build|shell\s*(?:and|&)\s*core|cat\s?[ab]|construction|demolition|strip[- ]?out|design(?:\s+stage)?|stage\s+[\w-]+|works?|handover|practical\s+completion)$/i;
 
+// The words before a company suffix are only part of the name while they are
+// capitalised: "referred back to Veretec Limited" names Veretec Limited.
+function trimToName(raw: string): string {
+  const words = raw.trim().split(/\s+/);
+  while (words.length > 1 && !/^[A-Z]/.test(words[0]!)) words.shift();
+  return words.join(" ");
+}
+
 // Documents belong to a party but are not the party: strip the document tail so
 // "specialist lighting designer’s documentation" reads as the designer.
 function cleanParty(raw: string): string | null {
@@ -383,7 +391,7 @@ export function extractDeferredTo(text: string): string | null {
   // 1. A named company anywhere in the note, captured in full.
   const company = text.match(COMPANY_NAME);
   if (company?.[1]) {
-    const cleaned = cleanParty(company[1]);
+    const cleaned = cleanParty(trimToName(company[1]));
     if (cleaned) return cleaned;
   }
 
@@ -419,7 +427,7 @@ export function namedParty(text: string): string | null {
   // A full company name always wins over its initials.
   const company = text.match(COMPANY_NAME);
   if (company?.[1]) {
-    const cleaned = cleanParty(company[1]);
+    const cleaned = cleanParty(trimToName(company[1]));
     if (cleaned) return cleaned;
   }
   const m = text.match(/\b(?:by|BY|By)\s+([A-Z][A-Z&.'-]{1,9})\b/);
