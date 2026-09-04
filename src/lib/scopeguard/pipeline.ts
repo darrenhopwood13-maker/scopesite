@@ -478,7 +478,39 @@ export function detectDeferrals(
   }
 
 
+  // A note that hands work to a named party ("... BY AMR ...") is a deferral
+  // even where no pattern and no trade cue catches it.
+  for (const { item, region } of items) {
+    if (region === "titleblock") continue;
+    for (const text of splitNotes(item.str)) {
+      if (text.length < 8) continue;
+      const named = namedParty(text);
+      if (!named) continue;
+      const key = text.toLowerCase();
+      if (seen.has(key)) continue;
+      const isRed = isRedish(item.colour);
+      const finding: Finding = {
+        raw_text: text,
+        region,
+        bbox: { x: item.x, y: item.y, w: item.width, h: item.height },
+        colour: item.colour,
+        font_size: item.fontSize,
+        is_red: isRed,
+        deferral_category: "by_others",
+        also_categories: [],
+        deferred_to: named,
+        severity: isRed ? "high" : "medium",
+        commercial_risk: null,
+        recommended_action: `Confirm what ${named} is providing and where the boundary with the main contract sits.`,
+        method: "named_party",
+      };
+      seen.set(key, finding);
+      findings.push(finding);
+    }
+  }
+
   // Stage 4 — colour flag: red text no pattern caught is still a hold.
+
   for (const { item, region } of items) {
     if (region === "titleblock") continue;
     const text = item.str.trim();
