@@ -36,10 +36,21 @@ export const analyseDrawing = createServerFn({ method: "POST" })
     // Replacement is the LAST step. Existing findings stay untouched until a
     // complete new set has been built, so a failed read never wipes good data.
     const replaceItems = async (rows: Array<Record<string, unknown>>) => {
+      // Columns that are NOT NULL with a default: a bulk insert sends the union
+      // of all keys, so any row missing one would send NULL instead of the
+      // default. Normalise them once, here, for every write path.
+      const safe = rows.map((row) => ({
+        ...row,
+        also_categories: (row["also_categories"] as string[] | null) ?? [],
+        candidate_trades: row["candidate_trades"] ?? [],
+        is_red: row["is_red"] ?? false,
+        page_number: row["page_number"] ?? 1,
+        item_type: row["item_type"] ?? ITEM_TYPE.body,
+      }));
       const { error: delError } = await supabase.from("drawing_items").delete().eq("drawing_id", drawing.id);
       if (delError) throw new Error(`Could not clear the previous findings: ${delError.message}`);
-      if (!rows.length) return;
-      const { error } = await supabase.from("drawing_items").insert(rows as never);
+      if (!safe.length) return;
+      const { error } = await supabase.from("drawing_items").insert(safe as never);
       if (error) throw new Error(`Could not record findings: ${error.message}`);
     };
 
