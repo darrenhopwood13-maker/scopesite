@@ -45,7 +45,9 @@ async function ensureWorker(pdfjs: any): Promise<void> {
     workerReady = (async () => {
       const g = globalThis as unknown as { pdfjsWorker?: unknown };
       if (!g.pdfjsWorker) {
-        g.pdfjsWorker = await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
+        g.pdfjsWorker = await import(
+          /* @vite-ignore */ "pdfjs-dist/legacy/build/pdf.worker.mjs" as string
+        );
       }
       // Never used because the message handler above is found first, but the
       // getter throws when it is empty.
