@@ -553,11 +553,12 @@ export function detectDeferrals(
     const isRed = isRedish(item.colour);
 
     for (const text of splitNotes(item.str)) {
-      if (text.length < 8) continue;
+      if (text.length < 8 || excluded(text)) continue;
       const matches = compiled.filter(({ re }) => re.test(text));
       if (!matches.length) continue;
 
-      const deferredTo = extractDeferredTo(text);
+      const named = extractDeferredTo(text);
+      const deferredTo = isOriginatorParty(named, originator) ? null : named;
       const partyNamed = deferredTo !== null || namesAParty(text);
 
       // One finding per source sentence, carrying the strongest classification.
