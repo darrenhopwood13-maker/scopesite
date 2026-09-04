@@ -159,7 +159,6 @@ export type Database = {
         Row: {
           allocated_trade_code: string | null
           allocation_status: string | null
-          also_categories: string[]
           bbox: Json | null
           colour: string | null
           commercial_risk: string | null
@@ -186,7 +185,6 @@ export type Database = {
         Insert: {
           allocated_trade_code?: string | null
           allocation_status?: string | null
-          also_categories?: string[]
           bbox?: Json | null
           colour?: string | null
           commercial_risk?: string | null
@@ -213,7 +211,6 @@ export type Database = {
         Update: {
           allocated_trade_code?: string | null
           allocation_status?: string | null
-          also_categories?: string[]
           bbox?: Json | null
           colour?: string | null
           commercial_risk?: string | null
