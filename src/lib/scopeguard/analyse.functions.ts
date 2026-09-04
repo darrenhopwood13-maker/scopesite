@@ -47,11 +47,23 @@ export const analyseDrawing = createServerFn({ method: "POST" })
         page_number: row["page_number"] ?? 1,
         item_type: row["item_type"] ?? ITEM_TYPE.body,
       }));
-      const { error: delError } = await supabase.from("drawing_items").delete().eq("drawing_id", drawing.id);
-      if (delError) throw new Error(`Could not clear the previous findings: ${delError.message}`);
-      if (!safe.length) return;
-      const { error } = await supabase.from("drawing_items").insert(safe as never);
-      if (error) throw new Error(`Could not record findings: ${error.message}`);
+      // Insert first, delete second: if the insert fails, the previous
+      // findings are still there. Deleting first made a bad insert wipe them.
+      const { data: previous } = await supabase
+        .from("drawing_items")
+        .select("id")
+        .eq("drawing_id", drawing.id);
+      const previousIds = (previous ?? []).map((r) => r.id);
+
+      if (safe.length) {
+        const { error } = await supabase.from("drawing_items").insert(safe as never);
+        if (error) throw new Error(`Could not record findings: ${error.message}`);
+      }
+
+      if (previousIds.length) {
+        const { error: delError } = await supabase.from("drawing_items").delete().in("id", previousIds);
+        if (delError) throw new Error(`Could not clear the previous findings: ${delError.message}`);
+      }
     };
 
     try {
