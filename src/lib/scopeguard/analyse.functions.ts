@@ -154,11 +154,8 @@ export const analyseDrawing = createServerFn({ method: "POST" })
               interface_guidance: a.interface_guidance,
               allocation_method: a.allocation_method,
             };
-          }) as never,
-        );
+          });
 
-        if (error) return await fail(`Could not record findings: ${error.message}`);
-      }
 
       // Allocation only ever runs on the body of the sheet. Titleblock text
       // and the standard notes strip name no scope, so they never reach the
