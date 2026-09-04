@@ -37,7 +37,7 @@ Order of work inside it:
 1. Page rotation normalised first, and the text positions confirmed to sit in the same frame as the page size before anything is split into regions. Proved against the Veretec sheet.
 2. Notes strip located from the titleblock border rectangle; the fixed right-hand 28% is used only when no border is found.
 3. Line merging — vertically when left edges are within 3pt, the gap is 0–6pt, font sizes within 0.3pt and the colour matches; horizontally on the same baseline when the gap is under 2pt.
-4. Triage: annotation rich / notes only / graphical only / unreadable, stated plainly on screen. No findings are ever produced from an empty extraction.
+4. Triage, counted honestly. Before anything is counted as body text, annotation-only text is filtered out: purely numeric strings, single letters, letter-number grid references, dimension strings, level datums such as +44836 or 43930, scale text such as 1 : 50, and scale bar figures. Only what remains is counted against the threshold. Vector path counting is restored, since it is the only thing separating a graphical sheet from an unreadable one. Each drawing record stores text span count, body text count, path count and layers present, for diagnosis. Classes: annotation rich / notes only / graphical only / unreadable, stated plainly on screen. No findings are ever produced from an empty extraction.
 5. Titleblock parse: drawing number, revision, date, scale, title, client, originator, issue status, plus drawing type and discipline code. Missing fields recorded blank, never guessed.
 6. Deferral detection across all text, plus the colour rule flagging red text as a high-severity hold. Where no responsible party is named, the party is left blank and the severity raised to high.
 7. On any failure: the drawing is marked failed, the error recorded, zero items created.
@@ -45,12 +45,14 @@ Order of work inside it:
 ## 6. Acceptance check, then stop
 
 Run both Grafton Street sheets:
-- Foster + Partners sheet returns at least seven deferrals including the fire specialist note.
-- Veretec sheet returns the red abeyance note as high severity.
+- Foster + Partners sheet returns at least seven deferrals including the fire specialist note, and classifies as notes only or graphical only — its 41 raw body lines are almost all grid references, so annotation rich is a fail.
+- Veretec sheet returns the red abeyance note as high severity, and classifies as annotation rich.
 - Both titleblocks parse, including type and discipline.
 - No finding without quoted evidence.
+- Right deferrals with the wrong triage class counts as a fail.
 
 I still need those two PDFs to run this check. I can build everything above first and hold at the check until they arrive.
+
 
 ## Technical notes
 
