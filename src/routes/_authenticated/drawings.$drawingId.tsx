@@ -73,6 +73,15 @@ function effectiveStatus(item: Item): "allocated" | "ambiguous" | "unallocated" 
   return (item.allocation_status as "allocated" | "ambiguous" | "unallocated") ?? "unallocated";
 }
 
+/** One vocabulary on screen: contested, clear, unclaimed. */
+const STATUS_LABELS: Record<string, string> = {
+  allocated: "Clear",
+  ambiguous: "Contested",
+  unallocated: "Unclaimed",
+  dismissed: "Dismissed",
+};
+const statusLabel = (item: Item) => STATUS_LABELS[effectiveStatus(item)] ?? "Unclaimed";
+
 function effectiveTrade(item: Item): string | null {
   return item.corrected_trade_code ?? item.allocated_trade_code ?? null;
 }
