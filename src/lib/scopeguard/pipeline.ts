@@ -638,7 +638,7 @@ export function detectDeferrals(
   for (const { item, region } of items) {
     if (region === "titleblock") continue;
     const text = item.str.trim();
-    if (text.length < 8 || !isRedish(item.colour)) continue;
+    if (text.length < 8 || !isRedish(item.colour) || excluded(text)) continue;
     if (findings.some((f) => text.includes(f.raw_text) || f.raw_text.includes(text))) continue;
     findings.push({
       raw_text: text,
