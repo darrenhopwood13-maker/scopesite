@@ -35,7 +35,25 @@ const SEVERITY_STYLES: Record<string, string> = {
   low: "text-severity-low",
 };
 
-type Item = Record<string, any>;
+type Item = {
+  id: string;
+  item_type: string;
+  raw_text: string;
+  region: string | null;
+  severity: string | null;
+  deferral_category: string | null;
+  deferred_to: string | null;
+  recommended_action: string | null;
+  is_red: boolean | null;
+  system_code: string | null;
+  allocation_status: string | null;
+  allocated_trade_code: string | null;
+  candidate_trades: unknown;
+  interface_guidance: string | null;
+  corrected_trade_code: string | null;
+  correction_status: string | null;
+  correction_note: string | null;
+};
 
 // Columns added after the generated database types were last refreshed.
 function alsoMatches(item: unknown): string[] {
