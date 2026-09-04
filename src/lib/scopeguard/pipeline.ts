@@ -139,7 +139,14 @@ const ANNOTATION_ONLY: RegExp[] = [
   /^(level|floor|storey|story|zone|block|core|grid|bay|room|area|plot|phase|sector|wing|unit|apartment|flat|plant|roof|basement|mezzanine|ground|podium)\s*[-–]?\s*[a-z0-9.]{0,6}$/i,
   /^(plan|section|elevation|detail|view|key ?plan|site plan|location plan|part plan|enlarged plan)\s*[a-z0-9-]{0,4}$/i,
   /^(ground|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\s+floor(\s+(plan|level))?$/i,
+  // Level datums and their labels: "RFW-LEVEL", "RF-LEVEL", "06-FFL 43930".
+  /^[a-z]{1,4}[-\s]?(level|ffl|fcl|ssl|sfl|aod|soffit|datum)\b[\s\d.,+-]*$/i,
+  /^\d{1,3}[-\s]?(level|ffl|fcl|ssl|sfl|aod|datum)\b[\s\d.,+-]*$/i,
+  // Location labels: street names and site boundaries name a place, not scope.
+  /^[a-z][a-z'\s-]*\s(street|road|lane|avenue|way|place|square|gardens|drive|close|court|row|terrace|mews|yard|park|hill|crescent|walk|wharf|embankment)$/i,
+  /^(site\s+|red\s?line\s+|party\s?wall\s+|building\s+)?(boundary|line)$/i,
 ];
+
 
 export function isAnnotationOnly(text: string): boolean {
   const t = text.trim();
