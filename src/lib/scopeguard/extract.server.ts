@@ -156,6 +156,13 @@ export async function extractDrawing(data: Uint8Array): Promise<ExtractResult> {
     layers = [];
   }
 
+  const revisionScanLines = mergeHorizontal(spans).map((s) => ({
+    str: s.str,
+    x: s.x,
+    y: s.y,
+    fontSize: s.fontSize,
+  }));
+
   const titleblockLines = items
     .filter((i) => i.region !== "body")
     .map((i) => ({
@@ -168,7 +175,7 @@ export async function extractDrawing(data: Uint8Array): Promise<ExtractResult> {
   return {
     spans,
     items,
-    titleblock: parseTitleblock(titleblockLines),
+    titleblock: parseTitleblock(titleblockLines, revisionScanLines),
     triage_class: triageClass,
     text_span_count: spans.length,
     body_text_count: bodyTextCount,

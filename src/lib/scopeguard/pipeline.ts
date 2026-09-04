@@ -221,7 +221,7 @@ function revisionRows(lines: TbLine[]): Array<{ rev: string; date: string }> {
   return rows;
 }
 
-export function parseTitleblock(lines: TbLine[]): Titleblock {
+export function parseTitleblock(lines: TbLine[], revisionScanLines?: TbLine[]): Titleblock {
 
   const clean = lines
     .map((l) => ({ ...l, str: l.str.trim() }))
@@ -254,7 +254,7 @@ export function parseTitleblock(lines: TbLine[]): Titleblock {
 
   // Revision history rows: "<rev>  <date>  <description>" on one baseline.
   // The sheet date is the date of the CURRENT revision, never the first row.
-  const revRows = revisionRows(clean);
+  const revRows = revisionRows(revisionScanLines ?? clean);
   const currentRow = tb.revision
     ? revRows.find((r) => r.rev === tb.revision)
     : revRows.slice().sort((a, b) => b.rev.localeCompare(a.rev))[0];
