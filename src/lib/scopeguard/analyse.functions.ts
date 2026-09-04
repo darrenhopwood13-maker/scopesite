@@ -120,7 +120,11 @@ export const analyseDrawing = createServerFn({ method: "POST" })
         .from("deferral_patterns")
         .select("id, category, pattern, default_severity, recommended_action, commercial_risk");
 
-      const findings = detectDeferrals(extract.items, (patterns ?? []) as DeferralPattern[]);
+      // Boilerplate exclusions are seeded alongside the detection patterns and
+      // the sheet's own author never counts as a party it defers to.
+      const findings = detectDeferrals(extract.items, (patterns ?? []) as DeferralPattern[], {
+        originator: extract.titleblock.originator,
+      });
 
       // Stages 5-7 run in the same pass: reading and allocating are one step.
       const [{ data: cues }, { data: prefixes }, { data: rules }] = await Promise.all([
