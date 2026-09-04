@@ -121,39 +121,10 @@ export const analyseDrawing = createServerFn({ method: "POST" })
       };
 
 
-      // Write what the sheet says about itself first, so the titleblock and
-      // triage survive even if recording the findings fails.
-      const { error: metaError } = await supabase
-        .from("drawings")
-        .update({
-          triage_class: extract.triage_class,
-          text_span_count: extract.text_span_count,
-          body_text_count: extract.body_text_count,
-          path_count: extract.path_count,
-          layers_present: extract.layers_present,
-          page_width: extract.page_width,
-          page_height: extract.page_height,
-          page_rotation: extract.page_rotation,
-          coordinate_frame_ok: extract.coordinate_frame_ok,
-          notes_strip_source: extract.notes_strip_source,
-          drawing_number: extract.titleblock.drawing_number,
-          revision: extract.titleblock.revision,
-          drawing_date: extract.titleblock.drawing_date,
-          drawing_scale: extract.titleblock.drawing_scale,
-          title: extract.titleblock.title,
-          drawing_client: extract.titleblock.drawing_client,
-          originator: extract.titleblock.originator,
-          issue_status: extract.titleblock.issue_status,
-          drawing_type: extract.titleblock.drawing_type,
-          discipline_code: extract.titleblock.discipline_code,
-        })
-        .eq("id", drawing.id);
-      if (metaError) return await fail(`Could not record the drawing details: ${metaError.message}`);
-
-      if (findings.length) {
-        // also_categories was added after the generated types were last refreshed.
-        const { error } = await supabase.from("drawing_items").insert(
-          findings.map((f) => {
+      // Everything is built in memory first. Nothing is deleted or written
+      // until the whole new set exists.
+      // also_categories was added after the generated types were last refreshed.
+      const deferralRows = findings.map((f) => {
             const a = allocate(f.raw_text, reference);
             return {
               ...stamp,
