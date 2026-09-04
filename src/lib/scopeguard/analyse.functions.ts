@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { detectDeferrals, type DeferralPattern } from "./pipeline";
+import { detectDeferrals, isAnnotationOnly, type DeferralPattern } from "./pipeline";
+import { allocate, type CodePrefix, type InterfaceRule, type TradeCue } from "./allocate";
+
 import { DRAWING_STATUS, ITEM_TYPE } from "./vocab";
 
 export const analyseDrawing = createServerFn({ method: "POST" })
@@ -48,15 +50,19 @@ export const analyseDrawing = createServerFn({ method: "POST" })
         .maybeSingle();
 
       if (twin) {
-        const { data: twinItems } = await supabase
+        const { data: twinItemRows } = await supabase
           .from("drawing_items")
-          .select("item_type, raw_text, region, page_number, bbox, colour, font_size, is_red, deferral_category, deferred_to, severity, commercial_risk, recommended_action, method, confidence")
+          .select(
+            "item_type, raw_text, region, page_number, bbox, colour, font_size, is_red, deferral_category, deferred_to, severity, commercial_risk, recommended_action, method, confidence, allocated_trade_code, allocation_status, system_code, candidate_trades, interface_rule_id, interface_guidance, allocation_method, bbox_frame",
+          )
           .eq("drawing_id", twin.id);
+        const twinItems = (twinItemRows ?? []) as unknown as Array<Record<string, unknown>>;
 
-        if (twinItems?.length) {
+        if (twinItems.length) {
           const { error } = await supabase
             .from("drawing_items")
-            .insert(twinItems.map((row) => ({ ...row, ...stamp })));
+            .insert(twinItems.map((row) => ({ ...row, ...stamp })) as never);
+
           if (error) return await fail(`Clone failed: ${error.message}`);
         }
 
@@ -87,6 +93,28 @@ export const analyseDrawing = createServerFn({ method: "POST" })
         .select("id, category, pattern, default_severity, recommended_action, commercial_risk");
 
       const findings = detectDeferrals(extract.items, (patterns ?? []) as DeferralPattern[]);
+
+      // Stages 5-7 run in the same pass: reading and allocating are one step.
+      const [{ data: cues }, { data: prefixes }, { data: rules }] = await Promise.all([
+        supabase.from("trade_cues").select("trade_code, cue, weight"),
+        supabase
+          .from("system_code_prefixes")
+          .select("prefix, trade_code, scope, project_id")
+          .or(`scope.eq.global,project_id.eq.${drawing.project_id}`),
+        supabase
+          .from("interface_rules")
+          .select("id, name, trigger_terms, context_terms, trade_codes, severity, guidance"),
+      ]);
+
+      const reference = {
+        cues: (cues ?? []) as TradeCue[],
+        prefixes: (prefixes ?? []) as CodePrefix[],
+        rules: (rules ?? []) as InterfaceRule[],
+        // The junction context is the whole sheet, not one annotation.
+        sheetContext: extract.items.map((i) => i.item.str).join(" "),
+
+      };
+
 
       // Write what the sheet says about itself first, so the titleblock and
       // triage survive even if recording the findings fails.
@@ -120,27 +148,85 @@ export const analyseDrawing = createServerFn({ method: "POST" })
       if (findings.length) {
         // also_categories was added after the generated types were last refreshed.
         const { error } = await supabase.from("drawing_items").insert(
-          findings.map((f) => ({
-            ...stamp,
-            item_type: ITEM_TYPE.deferral,
-            raw_text: f.raw_text,
-            region: f.region,
-            page_number: 1,
-            bbox: f.bbox,
-            colour: f.colour,
-            font_size: f.font_size,
-            is_red: f.is_red,
-            deferral_category: f.deferral_category,
-            also_categories: f.also_categories,
-            deferred_to: f.deferred_to,
-            severity: f.severity,
-            commercial_risk: f.commercial_risk,
-            recommended_action: f.recommended_action,
-            method: f.method,
-          })) as never,
+          findings.map((f) => {
+            const a = allocate(f.raw_text, reference);
+            return {
+              ...stamp,
+              item_type: ITEM_TYPE.deferral,
+              raw_text: f.raw_text,
+              region: f.region,
+              page_number: 1,
+              bbox: f.bbox,
+              // Extraction normalises rotation, so boxes are page space as rendered.
+              bbox_frame: "rotated",
+              colour: f.colour,
+              font_size: f.font_size,
+              is_red: f.is_red,
+              deferral_category: f.deferral_category,
+              also_categories: f.also_categories,
+              deferred_to: f.deferred_to,
+              severity: f.severity,
+              commercial_risk: f.commercial_risk,
+              recommended_action: f.recommended_action,
+              method: f.method,
+              allocation_status: a.allocation_status,
+              allocated_trade_code: a.allocated_trade_code,
+              candidate_trades: a.candidate_trades,
+              confidence: a.confidence,
+              system_code: a.system_code,
+              interface_rule_id: a.interface_rule_id,
+              interface_guidance: a.interface_guidance,
+              allocation_method: a.allocation_method,
+            };
+          }) as never,
         );
+
         if (error) return await fail(`Could not record findings: ${error.message}`);
       }
+
+      // Every other readable annotation on the sheet is allocated too — the
+      // Clear / Contested / Unclaimed tabs cover the whole sheet, not just
+      // the deferrals. Text already carried by a deferral is not repeated.
+      const deferralText = new Set(findings.map((f) => f.raw_text.toLowerCase()));
+      const others = extract.items
+        .filter(({ item, region }) => {
+          const t = item.str.trim();
+          if (region === "titleblock") return false;
+          if (t.length < 8 || isAnnotationOnly(t)) return false;
+          const lower = t.toLowerCase();
+          return ![...deferralText].some((d) => d.includes(lower) || lower.includes(d));
+        })
+        .map(({ item, region }) => {
+          const t = item.str.trim();
+          const a = allocate(t, reference);
+          return {
+            ...stamp,
+            item_type: region === "body" ? ITEM_TYPE.body : ITEM_TYPE.note,
+            raw_text: t,
+            region,
+            page_number: 1,
+            bbox: { x: item.x, y: item.y, w: item.width, h: item.height },
+            bbox_frame: "rotated",
+            colour: item.colour,
+            font_size: item.fontSize,
+            is_red: false,
+            allocation_status: a.allocation_status,
+            allocated_trade_code: a.allocated_trade_code,
+            candidate_trades: a.candidate_trades,
+            confidence: a.confidence,
+            system_code: a.system_code,
+            interface_rule_id: a.interface_rule_id,
+            interface_guidance: a.interface_guidance,
+            allocation_method: a.allocation_method,
+          };
+        });
+
+      if (others.length) {
+        const { error } = await supabase.from("drawing_items").insert(others as never);
+        if (error) return await fail(`Could not record the sheet's annotations: ${error.message}`);
+      }
+
+
 
       const { error: doneError } = await supabase
         .from("drawings")
