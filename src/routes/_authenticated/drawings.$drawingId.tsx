@@ -362,20 +362,24 @@ function DrawingPage() {
             </p>
           ) : null}
 
-          {(tab === "contested" ? contested : tab === "clear" ? clear : unclaimed).map((i) => (
+          {groupByText(tab === "contested" ? contested : tab === "clear" ? clear : unclaimed).map((g) => (
             <AllocationRow
-              key={i.id}
-              item={i}
+              key={g.item.id}
+              item={g.item}
+              ids={g.ids}
+              occurrences={g.ids.length}
               trades={trades.data ?? []}
               unknownPrefix={
-                i.system_code && !knownPrefixes.has(String(i.system_code).split("-")[0]!.toUpperCase())
-                  ? String(i.system_code).split("-")[0]!.toUpperCase()
+                g.item.system_code &&
+                !knownPrefixes.has(String(g.item.system_code).split("-")[0]!.toUpperCase())
+                  ? String(g.item.system_code).split("-")[0]!.toUpperCase()
                   : null
               }
               onCorrect={correct}
               onTeachPrefix={teachPrefix}
             />
           ))}
+
         </section>
       ) : null}
 
