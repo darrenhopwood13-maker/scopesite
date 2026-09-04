@@ -131,6 +131,14 @@ const ANNOTATION_ONLY: RegExp[] = [
   /^(scale|north|rev|revision|date|drawn|checked|do not scale.*)$/i,
   /^[\d.,]+\s?(mm|m|cm)$/i,
   /^\d{1,2}[-/]?[A-Z]{2,4}$/i, // level datum labels such as 05-FCL
+  // Zone and orientation labels: "STAIR CORE", "INTERIOR", "EXTERIOR", "NORTH
+  // ELEVATION", "LEVEL 04", "CORE 2". Names a place on the sheet, not scope.
+  /^(interior|exterior|internal|external|inside|outside|above|below|left|right|top|bottom|upper|lower|front|rear|near|far|typical|typ|existing|proposed|new|opposite hand|handed)$/i,
+  /^(north|south|east|west|north[- ]?east|north[- ]?west|south[- ]?east|south[- ]?west|ne|nw|se|sw)(\s+(elevation|facade|façade|wing|side|end|view|block|core))?$/i,
+  /^(stair|lift|service|riser|escape|access)?\s*(core|lobby|shaft|riser|well|landing)\s*\d*[a-z]?$/i,
+  /^(level|floor|storey|story|zone|block|core|grid|bay|room|area|plot|phase|sector|wing|unit|apartment|flat|plant|roof|basement|mezzanine|ground|podium)\s*[-–]?\s*[a-z0-9.]{0,6}$/i,
+  /^(plan|section|elevation|detail|view|key ?plan|site plan|location plan|part plan|enlarged plan)\s*[a-z0-9-]{0,4}$/i,
+  /^(ground|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\s+floor(\s+(plan|level))?$/i,
 ];
 
 export function isAnnotationOnly(text: string): boolean {

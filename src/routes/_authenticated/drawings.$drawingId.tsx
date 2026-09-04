@@ -73,6 +73,15 @@ function effectiveStatus(item: Item): "allocated" | "ambiguous" | "unallocated" 
   return (item.allocation_status as "allocated" | "ambiguous" | "unallocated") ?? "unallocated";
 }
 
+/** One vocabulary on screen: contested, clear, unclaimed. */
+const STATUS_LABELS: Record<string, string> = {
+  allocated: "Clear",
+  ambiguous: "Contested",
+  unallocated: "Unclaimed",
+  dismissed: "Dismissed",
+};
+const statusLabel = (item: Item) => STATUS_LABELS[effectiveStatus(item)] ?? "Unclaimed";
+
 function effectiveTrade(item: Item): string | null {
   return item.corrected_trade_code ?? item.allocated_trade_code ?? null;
 }
@@ -194,7 +203,7 @@ function DrawingPage() {
       "Deferred to": i.deferred_to ?? "Not named",
       "Also matches": alsoMatches(i).join(", "),
       Trade: effectiveTrade(i) ?? "",
-      Allocation: effectiveStatus(i),
+      Allocation: statusLabel(i),
       Action: i.recommended_action ?? "",
       "Red text": i.is_red ? "Yes" : "No",
     }));
@@ -402,7 +411,7 @@ function AllocationRow({
   return (
     <article className="rounded-lg border border-border bg-card p-4 space-y-3">
       <div className="flex flex-wrap items-center gap-3 text-sm">
-        <span className="font-medium uppercase">{effectiveStatus(item)}</span>
+        <span className="font-medium uppercase">{statusLabel(item)}</span>
         {effectiveTrade(item) ? (
           <span className="text-muted-foreground">{tradeName(effectiveTrade(item))}</span>
         ) : null}
