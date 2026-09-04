@@ -301,6 +301,16 @@ export function isRedish(hex: string): boolean {
   return r > 150 && g < 90 && b < 90;
 }
 
+// A merged notes block can hold a whole general-notes list. Findings must quote
+// one note, so split a block into sentences and test each one.
+export function splitNotes(text: string): string[] {
+  const parts = text
+    .split(/(?<=[.;])\s+(?=[A-Z0-9])/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 8);
+  return parts.length ? parts : [text.trim()];
+}
+
 export function detectDeferrals(
   items: Array<{ item: MergedItem; region: Region }>,
   patterns: DeferralPattern[],
@@ -319,10 +329,10 @@ export function detectDeferrals(
 
   for (const { item, region } of items) {
     if (region === "titleblock") continue;
-    const text = item.str.trim();
-    if (text.length < 8) continue;
     const isRed = isRedish(item.colour);
 
+    for (const text of splitNotes(item.str)) {
+    if (text.length < 8) continue;
     for (const { p, re } of compiled) {
       if (!re.test(text)) continue;
       const key = `${p.category}::${text.toLowerCase()}`;
@@ -348,6 +358,7 @@ export function detectDeferrals(
         recommended_action: p.recommended_action,
         method: isRed ? "notes_pattern+colour" : "notes_pattern",
       });
+    }
     }
   }
 
