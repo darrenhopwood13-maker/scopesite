@@ -35,3 +35,17 @@ export const DRAWING_STATUS_LABELS: Record<DrawingStatus, string> = {
   complete: "Read",
   failed: "Failed",
 };
+
+// Named accessors so no literal status string is typed twice in app code.
+export const DRAWING_STATUS = {
+  queued: "queued",
+  reading: "reading",
+  complete: "complete",
+  failed: "failed",
+} as const satisfies Record<DrawingStatus, DrawingStatus>;
+
+export const ITEM_TYPE = {
+  body: "body",
+  note: "note",
+  deferral: "deferral",
+} as const satisfies Record<ItemType, ItemType>;

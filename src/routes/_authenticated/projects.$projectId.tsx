@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { analyseDrawing } from "@/lib/scopeguard/analyse.functions";
 import { AccountBar } from "@/components/AccountBar";
 import { Disclaimer } from "@/components/Disclaimer";
-import { DRAWING_STATUS_LABELS, type DrawingStatus } from "@/lib/scopeguard/vocab";
+import { DRAWING_STATUS, DRAWING_STATUS_LABELS, type DrawingStatus } from "@/lib/scopeguard/vocab";
 
 
 export const Route = createFileRoute("/_authenticated/projects/$projectId")({
@@ -103,7 +103,7 @@ function ProjectPage() {
               file_name: file.name,
               storage_path: path,
               file_hash: hash,
-              status: "queued",
+              status: DRAWING_STATUS.queued,
             })
             .select("id")
             .single();
