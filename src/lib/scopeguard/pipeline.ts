@@ -606,9 +606,10 @@ export function detectDeferrals(
   for (const { item, region } of items) {
     if (region === "titleblock") continue;
     for (const text of splitNotes(item.str)) {
-      if (text.length < 8) continue;
+      if (text.length < 8 || excluded(text)) continue;
       const named = namedParty(text);
       if (!named) continue;
+      if (isOriginatorParty(named, originator)) continue;
       const key = text.toLowerCase();
       if (seen.has(key)) continue;
       const isRed = isRedish(item.colour);
