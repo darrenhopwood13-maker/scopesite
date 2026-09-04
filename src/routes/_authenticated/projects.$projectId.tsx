@@ -6,6 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { analyseDrawing } from "@/lib/scopeguard/analyse.functions";
 import { AccountBar } from "@/components/AccountBar";
 import { Disclaimer } from "@/components/Disclaimer";
+import { DRAWING_STATUS_LABELS, type DrawingStatus } from "@/lib/scopeguard/vocab";
+
 
 export const Route = createFileRoute("/_authenticated/projects/$projectId")({
   head: () => ({
