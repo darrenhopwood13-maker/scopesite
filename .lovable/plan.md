@@ -24,8 +24,10 @@ Magic-link email sign in, a signed-in area that is gated properly, and sign out.
 
 - Projects list and create project.
 - Project page: drag-and-drop upload of one or many PDFs, duplicate detection by file fingerprint, per-drawing status (queued, reading, done, failed).
+- Duplicate handling: the same file fingerprint already in the same project clones the existing findings onto the new drawing record and skips re-reading. The same file uploaded into a different project is read normally.
 - Deferrals register for a drawing: severity ordered, each row showing the exact wording, where on the sheet it came from, who it was deferred to, the commercial consequence and the action to take. Advisory disclaimer on screen and in the export.
 - Excel export of the register.
+
 
 ## 5. The reading step
 
