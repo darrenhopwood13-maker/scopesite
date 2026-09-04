@@ -343,21 +343,67 @@ export function parseTitleblock(lines: TbLine[], revisionScanLines?: TbLine[]): 
 /* ------------------------------------------------------------------ */
 
 const PARTY_PHRASES =
-  /(?:reviewed with|review by|reviewed by|confirmed by|designed by|determined by|defined by|provided by|carried out by|installed by|by)\s+((?:the\s+)?(?:appointed\s+|nominated\s+)?[A-Za-z'&/+ -]{4,60}?)(?:\.|,|;|$)/i;
-const PARTY_FALLBACK = /\b(?:with|to)\s+((?:the\s+)?[A-Za-z'&/+ -]{4,60}?)(?:\.|,|;|$)/i;
+  /(?:reviewed with|review by|reviewed by|confirmed by|agreed with|agreed by|approved by|coordinated with|co-ordinated with|designed by|determined by|defined by|specified by|provided by|carried out by|installed by|subject to review by|refer to|in accordance with|to suit|by)\s+((?:the\s+)?(?:appointed\s+|nominated\s+|agreed\s+|relevant\s+)?[A-Za-z'’&/+ -]{4,80}?)(?:\.|,|;|$)/i;
+const PARTY_FALLBACK = /\b(?:with|to)\s+((?:the\s+)?[A-Za-z'’&/+ -]{4,80}?)(?:\.|,|;|$)/i;
+
+// A company name is a party wherever it appears in the note, with or without a
+// verb in front of it: "SURVEY BY MB SURVEY SOLUTIONS LTD".
+const COMPANY_NAME =
+  /\b((?:[A-Za-z][A-Za-z&.'’-]*\s+){1,4}(?:Ltd|Ltd\.|Limited|LLP|L\.L\.P\.|PLC|Plc|Partners|Partnership))\b/i;
+
+const LEADING_NOISE =
+  /^(?:by|to|with|from|for|of|the|and|a|an|agreed|appointed|nominated|relevant|specialist's)\s+/i;
+
+// Stage and phase names are not parties. "TENANT FIT OUT" is a stage of the
+// works; the party is whoever is named alongside it.
+const STAGE_NAMES =
+  /^(?:tenant\s+fit[- ]?out|fit[- ]?out|base\s+build|shell\s*(?:and|&)\s*core|cat\s?[ab]|construction|demolition|strip[- ]?out|design(?:\s+stage)?|stage\s+[\w-]+|works?|handover|practical\s+completion)$/i;
+
+// The words before a company suffix are only part of the name while they are
+// capitalised: "referred back to Veretec Limited" names Veretec Limited.
+function trimToName(raw: string): string {
+  const words = raw.trim().split(/\s+/);
+  while (words.length > 1 && !/^[A-Z]/.test(words[0]!)) words.shift();
+  return words.join(" ");
+}
+
+// Documents belong to a party but are not the party: strip the document tail so
+// "specialist lighting designer’s documentation" reads as the designer.
+function cleanParty(raw: string): string | null {
+  let party = raw.replace(/\s+/g, " ").trim();
+  party = party.split(/[’']s\b/)[0]!.trim();
+  party = party
+    .replace(
+      /\s+(?:documentation|documents?|drawings?|details?|information|specification|schedule|report|requirements?|instructions?|approval)\b.*$/i,
+      "",
+    )
+    .trim();
+  while (LEADING_NOISE.test(party)) party = party.replace(LEADING_NOISE, "");
+  party = party.replace(/[.,;:]+$/, "").trim();
+  if (party.length < 3) return null;
+  if (STAGE_NAMES.test(party)) return null;
+  return party;
+}
 
 export function extractDeferredTo(text: string): string | null {
   if (/\bby others\b/i.test(text)) return null;
+
+  // 1. A named company anywhere in the note, captured in full.
+  const company = text.match(COMPANY_NAME);
+  if (company?.[1]) {
+    const cleaned = cleanParty(trimToName(company[1]));
+    if (cleaned) return cleaned;
+  }
+
+  // 2. Compound parties: "Landlord - Tenant Demarcation Schedule" names both.
+  if (/\blandlord\b\s*[-–—/&]?\s*(?:and\s+|to\s+)?\btenant\b/i.test(text)) return "Landlord and Tenant";
+
+  // 3. A party named after a verb or pointer phrase.
   const m = text.match(PARTY_PHRASES) ?? text.match(PARTY_FALLBACK);
   if (!m?.[1]) return null;
-  const party = m[1].trim().replace(/\s+/g, " ");
-  if (party.length < 4) return null;
-  if (
-    !/(specialist|consultant|architect|engineer|designer|contractor|tenant|landlord|client|employer|manufacturer|supplier|authority|surveyor)/i.test(
-      party,
-    )
-  )
-    return null;
+  const party = cleanParty(m[1]);
+  if (!party) return null;
+  if (!PARTY_WORDS.test(party)) return null;
   return party;
 }
 
@@ -366,7 +412,7 @@ const PARTY_WORDS =
 
 // Does the note name anybody at all to carry the item?
 export function namesAParty(text: string): boolean {
-  return PARTY_WORDS.test(text) || namedParty(text) !== null;
+  return extractDeferredTo(text) !== null || PARTY_WORDS.test(text) || namedParty(text) !== null;
 }
 
 // Sheets name suppliers and specialists by initials or company name:
@@ -378,6 +424,12 @@ const NOT_A_PARTY = new Set([
 ]);
 
 export function namedParty(text: string): string | null {
+  // A full company name always wins over its initials.
+  const company = text.match(COMPANY_NAME);
+  if (company?.[1]) {
+    const cleaned = cleanParty(trimToName(company[1]));
+    if (cleaned) return cleaned;
+  }
   const m = text.match(/\b(?:by|BY|By)\s+([A-Z][A-Z&.'-]{1,9})\b/);
   if (!m?.[1]) return null;
   const party = m[1].trim();
@@ -385,6 +437,7 @@ export function namedParty(text: string): string | null {
   if (PARTY_WORDS.test(party)) return null; // handled by the phrase parser
   return party;
 }
+
 
 
 export function isRedish(hex: string): boolean {
