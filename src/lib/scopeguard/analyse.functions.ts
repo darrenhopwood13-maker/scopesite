@@ -147,8 +147,25 @@ export const analyseDrawing = createServerFn({ method: "POST" })
       // Everything is built in memory first. Nothing is deleted or written
       // until the whole new set exists.
       // also_categories was added after the generated types were last refreshed.
+      // Allocation is only meaningful on a sheet whose body annotations were
+      // read. A notes-only or graphical-only sheet has no allocatable body
+      // text, so allocation is skipped entirely and the tabs read as not
+      // applicable rather than reporting false unclaimed items.
+      const allocationApplies =
+        extract.triage_class !== "notes_only" && extract.triage_class !== "graphical_only";
+      const noAllocation = {
+        allocation_status: null,
+        allocated_trade_code: null,
+        candidate_trades: [],
+        confidence: null,
+        system_code: null,
+        interface_rule_id: null,
+        interface_guidance: null,
+        allocation_method: null,
+      };
+
       const deferralRows = findings.map((f) => {
-            const a = allocate(f.raw_text, reference);
+            const a = allocationApplies ? allocate(f.raw_text, reference) : null;
             return {
               ...stamp,
               item_type: ITEM_TYPE.deferral,
@@ -168,14 +185,18 @@ export const analyseDrawing = createServerFn({ method: "POST" })
               commercial_risk: f.commercial_risk,
               recommended_action: f.recommended_action,
               method: f.method,
-              allocation_status: a.allocation_status,
-              allocated_trade_code: a.allocated_trade_code,
-              candidate_trades: a.candidate_trades,
-              confidence: a.confidence,
-              system_code: a.system_code,
-              interface_rule_id: a.interface_rule_id,
-              interface_guidance: a.interface_guidance,
-              allocation_method: a.allocation_method,
+              ...(a
+                ? {
+                    allocation_status: a.allocation_status,
+                    allocated_trade_code: a.allocated_trade_code,
+                    candidate_trades: a.candidate_trades,
+                    confidence: a.confidence,
+                    system_code: a.system_code,
+                    interface_rule_id: a.interface_rule_id,
+                    interface_guidance: a.interface_guidance,
+                    allocation_method: a.allocation_method,
+                  }
+                : noAllocation),
             };
           });
 
@@ -185,7 +206,7 @@ export const analyseDrawing = createServerFn({ method: "POST" })
       // Clear / Contested / Unclaimed tabs. Deferral detection still reads
       // every region.
       const deferralText = new Set(findings.map((f) => f.raw_text.toLowerCase()));
-      const others = extract.items
+      const others = (allocationApplies ? extract.items : [])
         .filter(({ item, region }) => {
           const t = item.str.trim();
           if (region !== "body") return false;
