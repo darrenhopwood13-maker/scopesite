@@ -98,7 +98,18 @@ function scoreCues(text: string, cues: TradeCue[]): Map<string, number> {
   return scores;
 }
 
-function matchRule(text: string, sheetContext: string, rules: InterfaceRule[]): InterfaceRule | null {
+// Some triggers are ordinary construction words that appear all over a facade
+// sheet ("metal angle" on a waterproofing termination). They only count as a
+// junction trigger where the item itself also says what they belong to.
+const LOOSE_TRIGGERS: Record<string, string[]> = {
+  "metal angle": ["facade", "cladding", "curtain wall", "rainscreen"],
+  "ms framing": ["facade", "cladding", "curtain wall", "rainscreen"],
+  unistrut: ["facade", "cladding", "curtain wall", "rainscreen"],
+};
+
+type RuleMatch = { rule: InterfaceRule; strength: number };
+
+function matchRules(text: string, sheetContext: string, rules: InterfaceRule[]): RuleMatch[] {
   // The junction condition is a property of the sheet, not of one line of
   // text: an upstand on a facade detail is the facade junction whether or not
   // the word "facade" appears in that particular annotation. The trigger must
@@ -107,13 +118,27 @@ function matchRule(text: string, sheetContext: string, rules: InterfaceRule[]): 
   const context = words(sheetContext);
   const inItem = (term: string) => containsTerm(hay, term);
   const inSheet = (term: string) => containsTerm(context, term);
+  const triggers = (r: InterfaceRule) =>
+    (r.trigger_terms ?? []).filter((t) => {
+      if (!inItem(t)) return false;
+      const needs = LOOSE_TRIGGERS[t.toLowerCase()];
+      return !needs || needs.some(inItem);
+    });
+
+  const out: RuleMatch[] = [];
   for (const r of rules) {
-    if (!r.trigger_terms?.some(inItem)) continue;
-    if (r.context_terms?.length && !r.context_terms.some((t) => inItem(t) || inSheet(t))) continue;
-    return r;
+    const hits = triggers(r);
+    if (!hits.length) continue;
+    const ctx = (r.context_terms ?? []).filter((t) => inItem(t) || inSheet(t));
+    if (r.context_terms?.length && !ctx.length) continue;
+    // More matched terms means the rule fits this item more closely; matches
+    // in the item itself count for more than matches elsewhere on the sheet.
+    const itemCtx = ctx.filter(inItem).length;
+    out.push({ rule: r, strength: hits.length * 2 + itemCtx + (ctx.length - itemCtx) * 0.25 });
   }
-  return null;
+  return out.sort((a, b) => b.strength - a.strength);
 }
+
 
 
 export function allocate(
