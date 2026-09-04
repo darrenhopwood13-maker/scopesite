@@ -145,25 +145,39 @@ export const analyseDrawing = createServerFn({ method: "POST" })
       if (findings.length) {
         // also_categories was added after the generated types were last refreshed.
         const { error } = await supabase.from("drawing_items").insert(
-          findings.map((f) => ({
-            ...stamp,
-            item_type: ITEM_TYPE.deferral,
-            raw_text: f.raw_text,
-            region: f.region,
-            page_number: 1,
-            bbox: f.bbox,
-            colour: f.colour,
-            font_size: f.font_size,
-            is_red: f.is_red,
-            deferral_category: f.deferral_category,
-            also_categories: f.also_categories,
-            deferred_to: f.deferred_to,
-            severity: f.severity,
-            commercial_risk: f.commercial_risk,
-            recommended_action: f.recommended_action,
-            method: f.method,
-          })) as never,
+          findings.map((f) => {
+            const a = allocate(f.raw_text, reference);
+            return {
+              ...stamp,
+              item_type: ITEM_TYPE.deferral,
+              raw_text: f.raw_text,
+              region: f.region,
+              page_number: 1,
+              bbox: f.bbox,
+              // Extraction normalises rotation, so boxes are page space as rendered.
+              bbox_frame: "rotated",
+              colour: f.colour,
+              font_size: f.font_size,
+              is_red: f.is_red,
+              deferral_category: f.deferral_category,
+              also_categories: f.also_categories,
+              deferred_to: f.deferred_to,
+              severity: f.severity,
+              commercial_risk: f.commercial_risk,
+              recommended_action: f.recommended_action,
+              method: f.method,
+              allocation_status: a.allocation_status,
+              allocated_trade_code: a.allocated_trade_code,
+              candidate_trades: a.candidate_trades,
+              confidence: a.confidence,
+              system_code: a.system_code,
+              interface_rule_id: a.interface_rule_id,
+              interface_guidance: a.interface_guidance,
+              allocation_method: a.allocation_method,
+            };
+          }) as never,
         );
+
         if (error) return await fail(`Could not record findings: ${error.message}`);
       }
 
