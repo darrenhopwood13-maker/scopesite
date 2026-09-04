@@ -480,10 +480,61 @@ export function splitNotes(text: string): string[] {
 
 
 
+/* ------------------------------------------------------------------ */
+/* Boilerplate and the sheet's own author                              */
+/* ------------------------------------------------------------------ */
+
+// The category the seeded exclusion rows carry in deferral_patterns. They sit
+// alongside the detection patterns so the list can be extended from data.
+export const EXCLUSION_CATEGORY = "boilerplate_exclusion";
+
+function normaliseName(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/\b(ltd|limited|llp|plc|partners|partnership|architects?)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+// A drawing referring back to its own author is not a scope deferral.
+export function isOriginatorParty(party: string | null, originator: string | null | undefined): boolean {
+  if (!party || !originator) return false;
+  const a = normaliseName(party);
+  const b = normaliseName(originator);
+  if (a.length < 3 || b.length < 3) return false;
+  return a === b || a.includes(b) || b.includes(a);
+}
+
+export type DetectOptions = {
+  exclusions?: string[];
+  originator?: string | null;
+};
+
 export function detectDeferrals(
   items: Array<{ item: MergedItem; region: Region }>,
   patterns: DeferralPattern[],
+  options: DetectOptions = {},
 ): Finding[] {
+  const originator = options.originator ?? null;
+  const exclusionRes: RegExp[] = [];
+  for (const p of [...(options.exclusions ?? []), ...patterns.filter((p) => p.category === EXCLUSION_CATEGORY).map((p) => p.pattern)]) {
+    try {
+      exclusionRes.push(new RegExp(p, "i"));
+    } catch {
+      // an unusable pattern is skipped, never guessed at
+    }
+  }
+
+  // Contractual boilerplate carries no scope meaning, and a sheet that only
+  // states its author's name is naming nobody new.
+  const excluded = (text: string): boolean => {
+    if (exclusionRes.some((re) => re.test(text))) return true;
+    if (originator && normaliseName(text) === normaliseName(originator)) return true;
+    return false;
+  };
+
+  patterns = patterns.filter((p) => p.category !== EXCLUSION_CATEGORY);
+
   const compiled: Array<{ p: DeferralPattern; re: RegExp }> = [];
   for (const p of patterns) {
     try {
