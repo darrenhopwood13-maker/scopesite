@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { analyseDrawing } from "@/lib/scopeguard/analyse.functions";
 import { Wordmark } from "@/components/Wordmark";
 import { Disclaimer } from "@/components/Disclaimer";
 
@@ -66,6 +69,18 @@ function DrawingPage() {
       return [...data].sort((a, b) => (order[a.severity ?? "low"] ?? 3) - (order[b.severity ?? "low"] ?? 3));
     },
   });
+
+  const runAnalysis = useServerFn(analyseDrawing);
+  const [reading, setReading] = useState(false);
+  const readAgain = async () => {
+    setReading(true);
+    try {
+      await runAnalysis({ data: { drawingId } });
+      await Promise.all([drawing.refetch(), items.refetch()]);
+    } finally {
+      setReading(false);
+    }
+  };
 
   const exportXlsx = async () => {
     const XLSX = await import("xlsx");
@@ -138,6 +153,14 @@ function DrawingPage() {
         <h2 className="font-display text-2xl">
           Deferrals ({items.data?.length ?? 0})
         </h2>
+        <div className="flex gap-3">
+        <button
+          onClick={readAgain}
+          disabled={reading}
+          className="rounded-md border border-border px-4 py-2 text-sm font-medium disabled:opacity-50"
+        >
+          {reading ? "Reading…" : "Read again"}
+        </button>
         <button
           onClick={exportXlsx}
           disabled={!items.data?.length}
@@ -145,6 +168,7 @@ function DrawingPage() {
         >
           Export to Excel
         </button>
+        </div>
       </div>
 
       <Disclaimer />

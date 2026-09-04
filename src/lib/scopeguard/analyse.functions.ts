@@ -32,6 +32,8 @@ export const analyseDrawing = createServerFn({ method: "POST" })
 
     try {
       await supabase.from("drawings").update({ status: "reading", error_message: null }).eq("id", drawing.id);
+      // Re-reading a sheet replaces its findings; it never adds a second set.
+      await supabase.from("drawing_items").delete().eq("drawing_id", drawing.id);
 
       // Same fingerprint already read in this project: clone, never re-read.
       const { data: twin } = await supabase
