@@ -346,10 +346,20 @@ export function isRedish(hex: string): boolean {
   return r > 150 && g < 90 && b < 90;
 }
 
-// A merged notes block can hold a whole general-notes list. Findings must quote
-// one note, so split a block into sentences and test each one.
+// A merged notes block may still hold more than one note. The general notes
+// list is numbered, so split on the note numbering first; sentence punctuation
+// is only a fallback for a long unnumbered block.
 export function splitNotes(text: string): string[] {
-  const raw = text
+  const t = text.trim();
+
+  const numbered = t.split(/\s(?=\d{1,2}[.)]\s)/).map((s) => s.trim()).filter(Boolean);
+  if (numbered.length > 1 && numbered.filter((s) => /^\d{1,2}[.)]\s/.test(s)).length > 1) {
+    return numbered.map((s) => s.replace(/^\d{1,2}[.)]\s*/, "").trim()).filter((s) => s.length >= 8);
+  }
+
+  if (t.length <= 400) return [t];
+
+  const raw = t
     .split(/(?<=[.;])\s+(?=[A-Z0-9])/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
@@ -363,8 +373,9 @@ export function splitNotes(text: string): string[] {
     else parts.push(p);
   }
   const kept = parts.filter((s) => s.length >= 8);
-  return kept.length ? kept : [text.trim()];
+  return kept.length ? kept : [t];
 }
+
 
 
 export function detectDeferrals(
