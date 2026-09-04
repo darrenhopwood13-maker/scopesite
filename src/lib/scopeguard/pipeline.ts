@@ -392,42 +392,60 @@ export function detectDeferrals(
   }
 
   const findings: Finding[] = [];
-  const seen = new Set<string>();
+  const seen = new Map<string, Finding>();
+  const rank = { high: 0, medium: 1, low: 2 } as const;
 
   for (const { item, region } of items) {
     if (region === "titleblock") continue;
     const isRed = isRedish(item.colour);
 
     for (const text of splitNotes(item.str)) {
-    if (text.length < 8) continue;
-    for (const { p, re } of compiled) {
-      if (!re.test(text)) continue;
-      const key = `${p.category}::${text.toLowerCase()}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
+      if (text.length < 8) continue;
+      const matches = compiled.filter(({ re }) => re.test(text));
+      if (!matches.length) continue;
 
       const deferredTo = extractDeferredTo(text);
-      let severity = (p.default_severity as Finding["severity"]) ?? "medium";
-      if (!deferredTo) severity = "high";
-      if (isRed) severity = "high";
+      const partyNamed = deferredTo !== null || namesAParty(text);
 
-      findings.push({
+      // One finding per source sentence, carrying the strongest classification.
+      let best: { p: DeferralPattern; severity: Finding["severity"] } | null = null;
+      const categories = new Set<string>();
+      for (const { p } of matches) {
+        categories.add(p.category);
+        let severity = (p.default_severity as Finding["severity"]) ?? "medium";
+        // Performance requirements and generic "refer to" pointers only reach
+        // high when the note names nobody to carry them.
+        const generic = p.category === "performance_req" || /\brefer to\b/i.test(p.pattern);
+        if (generic && partyNamed && rank[severity] < rank["medium"]) severity = "medium";
+        if (!partyNamed) severity = "high";
+        if (isRed) severity = "high";
+        if (!best || rank[severity] < rank[best.severity]) best = { p, severity };
+      }
+      if (!best) continue;
+
+      const key = text.toLowerCase();
+      if (seen.has(key)) continue;
+
+      const finding: Finding = {
         raw_text: text,
         region,
         bbox: { x: item.x, y: item.y, w: item.width, h: item.height },
         colour: item.colour,
         font_size: item.fontSize,
         is_red: isRed,
-        deferral_category: p.category,
+        deferral_category: best.p.category,
+        also_categories: [...categories].filter((c) => c !== best!.p.category),
         deferred_to: deferredTo,
-        severity,
-        commercial_risk: p.commercial_risk,
-        recommended_action: p.recommended_action,
+        severity: best.severity,
+        commercial_risk: best.p.commercial_risk,
+        recommended_action: best.p.recommended_action,
         method: isRed ? "notes_pattern+colour" : "notes_pattern",
-      });
-    }
+      };
+      seen.set(key, finding);
+      findings.push(finding);
     }
   }
+
 
   // Stage 4 — colour flag: red text no pattern caught is still a hold.
   for (const { item, region } of items) {
