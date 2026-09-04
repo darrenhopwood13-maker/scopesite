@@ -67,13 +67,9 @@ export const analyseDrawing = createServerFn({ method: "POST" })
           .eq("drawing_id", twin.id);
         const twinItems = (twinItemRows ?? []) as unknown as Array<Record<string, unknown>>;
 
-        if (twinItems.length) {
-          const { error } = await supabase
-            .from("drawing_items")
-            .insert(twinItems.map((row) => ({ ...row, ...stamp })) as never);
+        // Rows are built first; only then does the previous set get replaced.
+        await replaceItems(twinItems.map((row) => ({ ...row, ...stamp })));
 
-          if (error) return await fail(`Clone failed: ${error.message}`);
-        }
 
         const { id: _twinId, ...twinFields } = twin;
         await supabase
