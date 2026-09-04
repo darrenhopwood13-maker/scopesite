@@ -139,7 +139,14 @@ const ANNOTATION_ONLY: RegExp[] = [
   /^(level|floor|storey|story|zone|block|core|grid|bay|room|area|plot|phase|sector|wing|unit|apartment|flat|plant|roof|basement|mezzanine|ground|podium)\s*[-–]?\s*[a-z0-9.]{0,6}$/i,
   /^(plan|section|elevation|detail|view|key ?plan|site plan|location plan|part plan|enlarged plan)\s*[a-z0-9-]{0,4}$/i,
   /^(ground|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\s+floor(\s+(plan|level))?$/i,
+  // Level datums and their labels: "RFW-LEVEL", "RF-LEVEL", "06-FFL 43930".
+  /^[a-z]{1,4}[-\s]?(level|ffl|fcl|ssl|sfl|aod|soffit|datum)\b[\s\d.,+-]*$/i,
+  /^\d{1,3}[-\s]?(level|ffl|fcl|ssl|sfl|aod|datum)\b[\s\d.,+-]*$/i,
+  // Location labels: street names and site boundaries name a place, not scope.
+  /^[a-z][a-z'\s-]*\s(street|road|lane|avenue|way|place|square|gardens|drive|close|court|row|terrace|mews|yard|park|hill|crescent|walk|wharf|embankment)$/i,
+  /^(site\s+|red\s?line\s+|party\s?wall\s+|building\s+)?(boundary|line)$/i,
 ];
+
 
 export function isAnnotationOnly(text: string): boolean {
   const t = text.trim();
@@ -359,8 +366,26 @@ const PARTY_WORDS =
 
 // Does the note name anybody at all to carry the item?
 export function namesAParty(text: string): boolean {
-  return PARTY_WORDS.test(text);
+  return PARTY_WORDS.test(text) || namedParty(text) !== null;
 }
+
+// Sheets name suppliers and specialists by initials or company name:
+// "PPC ALUMINIUM CAPPING BY AMR TO MATCH PRINCIPLE TRIM". Common words that
+// follow "by" on a drawing are not parties.
+const NOT_A_PARTY = new Set([
+  "OTHERS", "THE", "MAIN", "ALL", "THIS", "THAT", "HAND", "SITE", "DESIGN", "AREA",
+  "PASS", "USING", "MEANS", "HAND.", "OTHER", "CLIENT", "TENANT", "LANDLORD",
+]);
+
+export function namedParty(text: string): string | null {
+  const m = text.match(/\bby\s+([A-Z][A-Z&.'-]{1,9}(?:\s+[A-Z][A-Z&.'-]{1,9}){0,2})\b/);
+  if (!m?.[1]) return null;
+  const party = m[1].trim();
+  if (party.split(/\s+/).some((w) => NOT_A_PARTY.has(w))) return null;
+  if (PARTY_WORDS.test(party)) return null; // handled by the phrase parser
+  return party;
+}
+
 
 export function isRedish(hex: string): boolean {
   if (!/^[0-9a-f]{6}$/i.test(hex)) return false;
@@ -471,7 +496,39 @@ export function detectDeferrals(
   }
 
 
+  // A note that hands work to a named party ("... BY AMR ...") is a deferral
+  // even where no pattern and no trade cue catches it.
+  for (const { item, region } of items) {
+    if (region === "titleblock") continue;
+    for (const text of splitNotes(item.str)) {
+      if (text.length < 8) continue;
+      const named = namedParty(text);
+      if (!named) continue;
+      const key = text.toLowerCase();
+      if (seen.has(key)) continue;
+      const isRed = isRedish(item.colour);
+      const finding: Finding = {
+        raw_text: text,
+        region,
+        bbox: { x: item.x, y: item.y, w: item.width, h: item.height },
+        colour: item.colour,
+        font_size: item.fontSize,
+        is_red: isRed,
+        deferral_category: "by_others",
+        also_categories: [],
+        deferred_to: named,
+        severity: isRed ? "high" : "medium",
+        commercial_risk: null,
+        recommended_action: `Confirm what ${named} is providing and where the boundary with the main contract sits.`,
+        method: "named_party",
+      };
+      seen.set(key, finding);
+      findings.push(finding);
+    }
+  }
+
   // Stage 4 — colour flag: red text no pattern caught is still a hold.
+
   for (const { item, region } of items) {
     if (region === "titleblock") continue;
     const text = item.str.trim();
