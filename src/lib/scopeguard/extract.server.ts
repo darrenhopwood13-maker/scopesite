@@ -33,8 +33,31 @@ function hex(n: number): string {
   return Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, "0");
 }
 
+// The reader runs server-side. pdf.js otherwise tries to resolve its worker
+// script by path at runtime, which does not exist in the deployed bundle
+// ("No such module '_libs/pdf.worker.mjs'"). Bundling the worker module and
+// handing it over as globalThis.pdfjsWorker keeps everything in-process.
+// The Part B browser viewer needs its own worker setup — do not share this one.
+let workerReady: Promise<void> | undefined;
+
+async function ensureWorker(pdfjs: any): Promise<void> {
+  if (!workerReady) {
+    workerReady = (async () => {
+      const g = globalThis as unknown as { pdfjsWorker?: unknown };
+      if (!g.pdfjsWorker) {
+        g.pdfjsWorker = await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
+      }
+      // Never used because the message handler above is found first, but the
+      // getter throws when it is empty.
+      pdfjs.GlobalWorkerOptions.workerSrc = "pdfjs-dist/legacy/build/pdf.worker.mjs";
+    })();
+  }
+  await workerReady;
+}
+
 export async function extractDrawing(data: Uint8Array): Promise<ExtractResult> {
   const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  await ensureWorker(pdfjs);
   const { getDocument, OPS, Util } = pdfjs as unknown as {
     getDocument: (args: Record<string, unknown>) => { promise: Promise<any> };
     OPS: Record<string, number>;
