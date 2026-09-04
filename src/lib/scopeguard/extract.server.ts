@@ -1,4 +1,9 @@
 // Server-only PDF reading. Never imported by browser code.
+// Both pdf.js and its worker are imported statically so the bundler inlines
+// them into the server bundle. A runtime/dynamic resolution fails in the
+// deployed worker runtime ("No such module '_libs/pdf.worker.mjs'").
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+import * as pdfjsWorkerModule from "pdfjs-dist/legacy/build/pdf.worker.mjs";
 import {
   isAnnotationOnly,
   mergeHorizontal,
