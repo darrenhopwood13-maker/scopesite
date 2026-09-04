@@ -33,12 +33,9 @@ async function sha256(file: File): Promise<string> {
 }
 
 function statusLabel(status: string): string {
-  if (status === "queued") return "Queued";
-  if (status === "reading") return "Reading";
-  if (status === "complete") return "Read";
-  if (status === "failed") return "Failed";
-  return status;
+  return DRAWING_STATUS_LABELS[status as DrawingStatus] ?? status;
 }
+
 
 function ProjectPage() {
   const { projectId } = Route.useParams();
