@@ -158,12 +158,20 @@ export type Database = {
       drawing_items: {
         Row: {
           allocated_trade_code: string | null
+          allocation_method: string | null
           allocation_status: string | null
           also_categories: string[]
           bbox: Json | null
+          bbox_frame: string | null
+          candidate_trades: Json
           colour: string | null
           commercial_risk: string | null
           confidence: number | null
+          corrected_at: string | null
+          corrected_by: string | null
+          corrected_trade_code: string | null
+          correction_note: string | null
+          correction_status: string | null
           created_at: string
           deferral_category: string | null
           deferral_pattern_id: string | null
@@ -171,6 +179,8 @@ export type Database = {
           drawing_id: string
           font_size: number | null
           id: string
+          interface_guidance: string | null
+          interface_rule_id: string | null
           is_red: boolean
           item_type: string
           method: string | null
@@ -185,12 +195,20 @@ export type Database = {
         }
         Insert: {
           allocated_trade_code?: string | null
+          allocation_method?: string | null
           allocation_status?: string | null
           also_categories?: string[]
           bbox?: Json | null
+          bbox_frame?: string | null
+          candidate_trades?: Json
           colour?: string | null
           commercial_risk?: string | null
           confidence?: number | null
+          corrected_at?: string | null
+          corrected_by?: string | null
+          corrected_trade_code?: string | null
+          correction_note?: string | null
+          correction_status?: string | null
           created_at?: string
           deferral_category?: string | null
           deferral_pattern_id?: string | null
@@ -198,6 +216,8 @@ export type Database = {
           drawing_id: string
           font_size?: number | null
           id?: string
+          interface_guidance?: string | null
+          interface_rule_id?: string | null
           is_red?: boolean
           item_type?: string
           method?: string | null
@@ -212,12 +232,20 @@ export type Database = {
         }
         Update: {
           allocated_trade_code?: string | null
+          allocation_method?: string | null
           allocation_status?: string | null
           also_categories?: string[]
           bbox?: Json | null
+          bbox_frame?: string | null
+          candidate_trades?: Json
           colour?: string | null
           commercial_risk?: string | null
           confidence?: number | null
+          corrected_at?: string | null
+          corrected_by?: string | null
+          corrected_trade_code?: string | null
+          correction_note?: string | null
+          correction_status?: string | null
           created_at?: string
           deferral_category?: string | null
           deferral_pattern_id?: string | null
@@ -225,6 +253,8 @@ export type Database = {
           drawing_id?: string
           font_size?: number | null
           id?: string
+          interface_guidance?: string | null
+          interface_rule_id?: string | null
           is_red?: boolean
           item_type?: string
           method?: string | null
@@ -250,6 +280,13 @@ export type Database = {
             columns: ["drawing_id"]
             isOneToOne: false
             referencedRelation: "drawings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_items_interface_rule_id_fkey"
+            columns: ["interface_rule_id"]
+            isOneToOne: false
+            referencedRelation: "interface_rules"
             referencedColumns: ["id"]
           },
           {
