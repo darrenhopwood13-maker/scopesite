@@ -314,3 +314,82 @@ drop policy if exists "own drawing files" on storage.objects;
 create policy "own drawing files" on storage.objects for all to authenticated
   using (bucket_id = 'drawings' and (storage.foldername(name))[1] = auth.uid()::text)
   with check (bucket_id = 'drawings' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ------------------------------------------ phase 3 steps 1-2 (see db/phase3-parties.sql)
+
+-- ------------------------------------------------------------------ parties
+create table if not exists public.parties (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references public.projects(id) on delete cascade,
+  owner_id uuid not null,
+  canonical_name text not null,
+  normalised_name text not null,
+  appointed_status text not null default 'unknown'
+    check (appointed_status in ('unknown', 'appointed', 'not_appointed')),
+  needs_review boolean not null default false,
+  review_reason text,
+  merged_into_party_id uuid references public.parties(id) on delete set null,
+  created_at timestamptz not null default now(),
+  unique (project_id, normalised_name)
+);
+
+create table if not exists public.party_aliases (
+  id uuid primary key default gen_random_uuid(),
+  party_id uuid not null references public.parties(id) on delete cascade,
+  project_id uuid not null references public.projects(id) on delete cascade,
+  owner_id uuid not null,
+  alias text not null,
+  normalised_alias text not null,
+  source text,
+  created_at timestamptz not null default now(),
+  unique (project_id, normalised_alias)
+);
+
+alter table public.drawing_items
+  add column if not exists party_id uuid references public.parties(id) on delete set null;
+
+-- ----------------------------------------------------------- corroborations
+alter table public.corroborations
+  add column if not exists kind text not null default 'party',
+  add column if not exists party_id uuid references public.parties(id) on delete cascade,
+  add column if not exists drawing_ids uuid[] not null default '{}'::uuid[],
+  add column if not exists originators text[] not null default '{}'::text[];
+
+create table if not exists public.corroboration_items (
+  id uuid primary key default gen_random_uuid(),
+  corroboration_id uuid not null references public.corroborations(id) on delete cascade,
+  item_id uuid not null references public.drawing_items(id) on delete cascade,
+  project_id uuid not null references public.projects(id) on delete cascade,
+  owner_id uuid not null,
+  created_at timestamptz not null default now(),
+  unique (corroboration_id, item_id)
+);
+
+create index if not exists parties_project_idx on public.parties (project_id);
+create index if not exists party_aliases_project_idx on public.party_aliases (project_id);
+create index if not exists drawing_items_party_idx on public.drawing_items (party_id);
+create index if not exists corroborations_party_idx on public.corroborations (party_id);
+create index if not exists corroboration_items_corr_idx on public.corroboration_items (corroboration_id);
+
+-- ------------------------------------------------------------------- grants
+grant select, insert, update, delete on public.parties to authenticated;
+grant select, insert, update, delete on public.party_aliases to authenticated;
+grant select, insert, update, delete on public.corroboration_items to authenticated;
+grant all on public.parties, public.party_aliases, public.corroboration_items to service_role;
+
+-- ---------------------------------------------------------------------- rls
+alter table public.parties enable row level security;
+alter table public.party_aliases enable row level security;
+alter table public.corroboration_items enable row level security;
+
+drop policy if exists "own parties" on public.parties;
+create policy "own parties" on public.parties for all to authenticated
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+
+drop policy if exists "own party aliases" on public.party_aliases;
+create policy "own party aliases" on public.party_aliases for all to authenticated
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+
+drop policy if exists "own corroboration items" on public.corroboration_items;
+create policy "own corroboration items" on public.corroboration_items for all to authenticated
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());

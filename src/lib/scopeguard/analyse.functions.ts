@@ -277,6 +277,18 @@ export const analyseDrawing = createServerFn({ method: "POST" })
         .eq("id", drawing.id);
       if (metaError) return await fail(`Could not record the drawing details: ${metaError.message}`);
 
+      // Party register and party corroborations run in the same pass.
+      try {
+        const { refreshPartyRegister } = await import("./party-register.server");
+        await refreshPartyRegister(supabase, drawing.id, {
+          project_id: drawing.project_id,
+          owner_id: drawing.owner_id,
+        });
+      } catch {
+        // The register is a downstream view of the findings: a failure here
+        // must not mark a good read as failed.
+      }
+
       const { error: doneError } = await supabase
         .from("drawings")
         .update({ status: DRAWING_STATUS.complete, error_message: null, analysed_at: new Date().toISOString() })
