@@ -43,22 +43,24 @@ export type Finding = {
 /* Stage 1 — line merging                                              */
 /* ------------------------------------------------------------------ */
 
-// Horizontal: same baseline, gap under 2pt. Recovers split system codes.
+// Horizontal: same baseline, small gap. Recovers split system codes and the
+// trailing fragments some fonts emit ("... designer" + "’s documentation.").
 export function mergeHorizontal(spans: Span[]): Span[] {
   const sorted = [...spans].sort((a, b) => a.y - b.y || a.x - b.x);
   const out: Span[] = [];
   for (const s of sorted) {
     const prev = out[out.length - 1];
+    const gap = prev ? s.x - (prev.x + prev.width) : 0;
     if (
       prev &&
       Math.abs(prev.y - s.y) <= 0.5 &&
       Math.abs(prev.fontSize - s.fontSize) <= 0.3 &&
       prev.colour === s.colour &&
       s.x >= prev.x &&
-      s.x - (prev.x + prev.width) < 2
+      gap < Math.max(2, s.fontSize * 0.75)
     ) {
-      const gap = s.x - (prev.x + prev.width);
-      prev.str = prev.str + (gap > 0.6 && !prev.str.endsWith(" ") ? " " : "") + s.str;
+      const glue = /^[’'",.;:)\]]/.test(s.str) ? "" : gap > 0.6 && !prev.str.endsWith(" ") ? " " : "";
+      prev.str = prev.str + glue + s.str;
       prev.width = s.x + s.width - prev.x;
       continue;
     }
@@ -68,7 +70,12 @@ export function mergeHorizontal(spans: Span[]): Span[] {
 }
 
 // Vertical: left edges within 3pt, gap 0-6pt, font size within 0.3pt, same colour.
-export function mergeVertical(spans: Span[]): MergedItem[] {
+// `startsNewBlock` marks lines that begin a numbered note; they never fold into
+// the note above them.
+export function mergeVertical(
+  spans: Span[],
+  startsNewBlock?: (s: Span) => boolean,
+): MergedItem[] {
   // Bucket the left edge before sorting: two lines of the same paragraph can
   // differ by a fraction of a point, which would otherwise reverse their order.
   const bucket = (v: number) => Math.round(v / 3);
@@ -86,6 +93,7 @@ export function mergeVertical(spans: Span[]): MergedItem[] {
       if (used[j]) continue;
       const c = sorted[j]!;
       if (bucket(c.x) - bucket(last.x) > 1) break;
+      if (startsNewBlock?.(c)) break;
       const gap = c.y - (last.y + last.height * 0);
       const lineGap = c.y - last.y - last.fontSize;
       if (
@@ -108,6 +116,7 @@ export function mergeVertical(spans: Span[]): MergedItem[] {
   }
   return out.sort((a, b) => a.y - b.y || a.x - b.x);
 }
+
 
 /* ------------------------------------------------------------------ */
 /* Triage                                                              */
