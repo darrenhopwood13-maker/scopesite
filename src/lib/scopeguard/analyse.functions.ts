@@ -185,6 +185,9 @@ export const analyseDrawing = createServerFn({ method: "POST" })
             colour: item.colour,
             font_size: item.fontSize,
             is_red: false,
+            // Always explicit: a bulk insert sends every key present on any row,
+            // so an omitted key here would be written as NULL, not defaulted.
+            also_categories: [] as string[],
             allocation_status: a.allocation_status,
             allocated_trade_code: a.allocated_trade_code,
             candidate_trades: a.candidate_trades,
