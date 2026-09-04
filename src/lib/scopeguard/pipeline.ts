@@ -378,7 +378,7 @@ const NOT_A_PARTY = new Set([
 ]);
 
 export function namedParty(text: string): string | null {
-  const m = text.match(/\bby\s+([A-Z][A-Z&.'-]{1,9}(?:\s+[A-Z][A-Z&.'-]{1,9}){0,2})\b/);
+  const m = text.match(/\b(?:by|BY|By)\s+([A-Z][A-Z&.'-]{1,9})\b/);
   if (!m?.[1]) return null;
   const party = m[1].trim();
   if (party.split(/\s+/).some((w) => NOT_A_PARTY.has(w))) return null;
