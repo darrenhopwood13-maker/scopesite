@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { analyseDrawing } from "@/lib/scopeguard/analyse.functions";
-import { Wordmark } from "@/components/Wordmark";
+import { AccountBar } from "@/components/AccountBar";
 import { Disclaimer } from "@/components/Disclaimer";
 
 export const Route = createFileRoute("/_authenticated/projects/$projectId")({
@@ -125,12 +125,11 @@ function ProjectPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10 space-y-8">
-      <div className="flex items-center justify-between">
-        <Wordmark />
-        <Link to="/projects" className="text-sm text-muted-foreground hover:text-foreground">
+      <AccountBar>
+        <Link to="/projects" className="text-muted-foreground hover:text-foreground">
           All projects
         </Link>
-      </div>
+      </AccountBar>
 
       <header className="space-y-1">
         <h1 className="font-display text-3xl">{project.data?.name ?? "Project"}</h1>
