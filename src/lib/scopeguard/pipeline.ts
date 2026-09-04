@@ -649,7 +649,7 @@ export function detectDeferrals(
       is_red: true,
       deferral_category: "hold_status",
       also_categories: [],
-      deferred_to: extractDeferredTo(text),
+      deferred_to: isOriginatorParty(extractDeferredTo(text), originator) ? null : extractDeferredTo(text),
       severity: "high",
       commercial_risk: null,
       recommended_action:
