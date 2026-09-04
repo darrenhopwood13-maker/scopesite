@@ -36,11 +36,34 @@ export const analyseDrawing = createServerFn({ method: "POST" })
     // Replacement is the LAST step. Existing findings stay untouched until a
     // complete new set has been built, so a failed read never wipes good data.
     const replaceItems = async (rows: Array<Record<string, unknown>>) => {
-      const { error: delError } = await supabase.from("drawing_items").delete().eq("drawing_id", drawing.id);
-      if (delError) throw new Error(`Could not clear the previous findings: ${delError.message}`);
-      if (!rows.length) return;
-      const { error } = await supabase.from("drawing_items").insert(rows as never);
-      if (error) throw new Error(`Could not record findings: ${error.message}`);
+      // Columns that are NOT NULL with a default: a bulk insert sends the union
+      // of all keys, so any row missing one would send NULL instead of the
+      // default. Normalise them once, here, for every write path.
+      const safe = rows.map((row) => ({
+        ...row,
+        also_categories: (row["also_categories"] as string[] | null) ?? [],
+        candidate_trades: row["candidate_trades"] ?? [],
+        is_red: row["is_red"] ?? false,
+        page_number: row["page_number"] ?? 1,
+        item_type: row["item_type"] ?? ITEM_TYPE.body,
+      }));
+      // Insert first, delete second: if the insert fails, the previous
+      // findings are still there. Deleting first made a bad insert wipe them.
+      const { data: previous } = await supabase
+        .from("drawing_items")
+        .select("id")
+        .eq("drawing_id", drawing.id);
+      const previousIds = (previous ?? []).map((r) => r.id);
+
+      if (safe.length) {
+        const { error } = await supabase.from("drawing_items").insert(safe as never);
+        if (error) throw new Error(`Could not record findings: ${error.message}`);
+      }
+
+      if (previousIds.length) {
+        const { error: delError } = await supabase.from("drawing_items").delete().in("id", previousIds);
+        if (delError) throw new Error(`Could not clear the previous findings: ${delError.message}`);
+      }
     };
 
     try {
@@ -62,7 +85,7 @@ export const analyseDrawing = createServerFn({ method: "POST" })
         const { data: twinItemRows } = await supabase
           .from("drawing_items")
           .select(
-            "item_type, raw_text, region, page_number, bbox, colour, font_size, is_red, deferral_category, deferred_to, severity, commercial_risk, recommended_action, method, confidence, allocated_trade_code, allocation_status, system_code, candidate_trades, interface_rule_id, interface_guidance, allocation_method, bbox_frame",
+            "item_type, raw_text, region, page_number, bbox, colour, font_size, is_red, deferral_category, also_categories, deferred_to, severity, commercial_risk, recommended_action, method, confidence, allocated_trade_code, allocation_status, system_code, candidate_trades, interface_rule_id, interface_guidance, allocation_method, bbox_frame",
           )
           .eq("drawing_id", twin.id);
         const twinItems = (twinItemRows ?? []) as unknown as Array<Record<string, unknown>>;
@@ -185,6 +208,9 @@ export const analyseDrawing = createServerFn({ method: "POST" })
             colour: item.colour,
             font_size: item.fontSize,
             is_red: false,
+            // Always explicit: a bulk insert sends every key present on any row,
+            // so an omitted key here would be written as NULL, not defaulted.
+            also_categories: [] as string[],
             allocation_status: a.allocation_status,
             allocated_trade_code: a.allocated_trade_code,
             candidate_trades: a.candidate_trades,
