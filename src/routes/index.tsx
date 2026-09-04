@@ -54,7 +54,7 @@ function Index() {
       </header>
 
       <main className="mx-auto max-w-5xl px-6 py-16">
-        <h1 className="max-w-3xl font-display text-4xl leading-tight font-600 tracking-tight sm:text-5xl">
+        <h1 className="max-w-3xl font-display text-4xl leading-tight font-semibold tracking-tight sm:text-5xl">
           Scope falls between packages. It is printed on the drawings, unread.
         </h1>
         <p className="mt-6 max-w-2xl text-base leading-relaxed text-muted-foreground">
@@ -65,7 +65,7 @@ function Index() {
         </p>
 
         <div className="mt-10 flex flex-wrap items-center gap-4">
-          <span className="cursor-not-allowed rounded-sm bg-primary/40 px-5 py-3 text-sm font-500 text-primary-foreground">
+          <span className="cursor-not-allowed rounded-sm bg-primary/40 px-5 py-3 text-sm font-medium text-primary-foreground">
             Sign in
           </span>
           <span className="font-mono text-xs uppercase tracking-[0.16em] text-accent">
@@ -76,7 +76,7 @@ function Index() {
         <dl className="mt-16 grid gap-px overflow-hidden rounded-sm border border-border bg-border sm:grid-cols-2">
           {CAPABILITIES.map((c) => (
             <div key={c.title} className="bg-card p-6">
-              <dt className="font-display text-sm font-600 uppercase tracking-[0.12em] text-primary">
+              <dt className="font-display text-sm font-semibold uppercase tracking-[0.12em] text-primary">
                 {c.title}
               </dt>
               <dd className="mt-3 text-sm leading-relaxed text-muted-foreground">{c.body}</dd>
