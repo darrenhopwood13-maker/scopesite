@@ -65,7 +65,7 @@ function DrawingPage() {
         .from("drawing_items")
         .select("*")
         .eq("drawing_id", drawingId)
-        .eq("item_type", "deferral");
+        .eq("item_type", ITEM_TYPE.deferral);
       if (error) throw error;
       const order: Record<string, number> = { high: 0, medium: 1, low: 2 };
       return [...data].sort((a, b) => (order[a.severity ?? "low"] ?? 3) - (order[b.severity ?? "low"] ?? 3));

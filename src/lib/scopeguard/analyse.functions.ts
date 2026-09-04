@@ -28,7 +28,7 @@ export const analyseDrawing = createServerFn({ method: "POST" })
         .from("drawings")
         .update({ status: DRAWING_STATUS.failed, error_message: message.slice(0, 500), analysed_at: new Date().toISOString() })
         .eq("id", drawing.id);
-      return { status: DRAWING_STATUS.failed as const, error: message, items: 0 };
+      return { status: DRAWING_STATUS.failed, error: message, items: 0 };
     };
 
     try {
@@ -71,7 +71,7 @@ export const analyseDrawing = createServerFn({ method: "POST" })
           })
           .eq("id", drawing.id);
 
-        return { status: DRAWING_STATUS.complete as const, cloned: true, items: twinItems?.length ?? 0 };
+        return { status: DRAWING_STATUS.complete, cloned: true, items: twinItems?.length ?? 0 };
       }
 
       const { data: file, error: fileError } = await supabase.storage
@@ -148,7 +148,7 @@ export const analyseDrawing = createServerFn({ method: "POST" })
         .eq("id", drawing.id);
       if (doneError) return await fail(`Could not finish the reading: ${doneError.message}`);
 
-      return { status: DRAWING_STATUS.complete as const, cloned: false, items: findings.length };
+      return { status: DRAWING_STATUS.complete, cloned: false, items: findings.length };
 
     } catch (error) {
       // Fail closed: status failed, error recorded, no partial findings kept.
