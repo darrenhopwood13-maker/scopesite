@@ -50,8 +50,9 @@ export const analyseDrawing = createServerFn({ method: "POST" })
       if (twin) {
         const { data: twinItems } = await supabase
           .from("drawing_items")
-          .select("item_type, raw_text, region, page_number, bbox, colour, font_size, is_red, deferral_category, deferred_to, severity, commercial_risk, recommended_action, method, confidence")
+          .select("item_type, raw_text, region, page_number, bbox, colour, font_size, is_red, deferral_category, deferred_to, severity, commercial_risk, recommended_action, method, confidence, allocated_trade_code, allocation_status, system_code, candidate_trades, interface_rule_id, interface_guidance, allocation_method, bbox_frame" as never)
           .eq("drawing_id", twin.id);
+
 
         if (twinItems?.length) {
           const { error } = await supabase
