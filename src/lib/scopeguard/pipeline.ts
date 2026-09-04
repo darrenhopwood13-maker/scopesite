@@ -366,8 +366,26 @@ const PARTY_WORDS =
 
 // Does the note name anybody at all to carry the item?
 export function namesAParty(text: string): boolean {
-  return PARTY_WORDS.test(text);
+  return PARTY_WORDS.test(text) || namedParty(text) !== null;
 }
+
+// Sheets name suppliers and specialists by initials or company name:
+// "PPC ALUMINIUM CAPPING BY AMR TO MATCH PRINCIPLE TRIM". Common words that
+// follow "by" on a drawing are not parties.
+const NOT_A_PARTY = new Set([
+  "OTHERS", "THE", "MAIN", "ALL", "THIS", "THAT", "HAND", "SITE", "DESIGN", "AREA",
+  "PASS", "USING", "MEANS", "HAND.", "OTHER", "CLIENT", "TENANT", "LANDLORD",
+]);
+
+export function namedParty(text: string): string | null {
+  const m = text.match(/\bby\s+([A-Z][A-Z&.'-]{1,9}(?:\s+[A-Z][A-Z&.'-]{1,9}){0,2})\b/);
+  if (!m?.[1]) return null;
+  const party = m[1].trim();
+  if (party.split(/\s+/).some((w) => NOT_A_PARTY.has(w))) return null;
+  if (PARTY_WORDS.test(party)) return null; // handled by the phrase parser
+  return party;
+}
+
 
 export function isRedish(hex: string): boolean {
   if (!/^[0-9a-f]{6}$/i.test(hex)) return false;
