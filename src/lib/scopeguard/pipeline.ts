@@ -340,12 +340,23 @@ export function isRedish(hex: string): boolean {
 // A merged notes block can hold a whole general-notes list. Findings must quote
 // one note, so split a block into sentences and test each one.
 export function splitNotes(text: string): string[] {
-  const parts = text
+  const raw = text
     .split(/(?<=[.;])\s+(?=[A-Z0-9])/)
     .map((s) => s.trim())
-    .filter((s) => s.length >= 8);
-  return parts.length ? parts : [text.trim()];
+    .filter((s) => s.length > 0);
+  // A full stop mid-annotation ("... CLADDING SPECIALIST. IN ABEYANCE") is not
+  // a note boundary. Only treat a fragment as its own note if it reads like a
+  // sentence in its own right; otherwise fold it back into the previous note.
+  const parts: string[] = [];
+  for (const p of raw) {
+    const standalone = p.length >= 30 && p.split(/\s+/).length >= 5;
+    if (!standalone && parts.length) parts[parts.length - 1] += ` ${p}`;
+    else parts.push(p);
+  }
+  const kept = parts.filter((s) => s.length >= 8);
+  return kept.length ? kept : [text.trim()];
 }
+
 
 export function detectDeferrals(
   items: Array<{ item: MergedItem; region: Region }>,
