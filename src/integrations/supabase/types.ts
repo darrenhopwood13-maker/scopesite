@@ -14,17 +14,526 @@ export type Database = {
   }
   public: {
     Tables: {
-      _scopeguard_probe: {
+      corroborations: {
+        Row: {
+          created_at: string
+          id: string
+          item_ids: string[]
+          owner_id: string
+          project_id: string
+          severity: string | null
+          summary: string | null
+          topic: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          item_ids?: string[]
+          owner_id: string
+          project_id: string
+          severity?: string | null
+          summary?: string | null
+          topic: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          item_ids?: string[]
+          owner_id?: string
+          project_id?: string
+          severity?: string | null
+          summary?: string | null
+          topic?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "corroborations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coverage: {
+        Row: {
+          created_at: string
+          drawing_id: string
+          id: string
+          note: string | null
+          owner_id: string
+          project_id: string
+          status: string
+          trade_code: string
+        }
+        Insert: {
+          created_at?: string
+          drawing_id: string
+          id?: string
+          note?: string | null
+          owner_id: string
+          project_id: string
+          status?: string
+          trade_code: string
+        }
+        Update: {
+          created_at?: string
+          drawing_id?: string
+          id?: string
+          note?: string | null
+          owner_id?: string
+          project_id?: string
+          status?: string
+          trade_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coverage_drawing_id_fkey"
+            columns: ["drawing_id"]
+            isOneToOne: false
+            referencedRelation: "drawings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coverage_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coverage_trade_code_fkey"
+            columns: ["trade_code"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      deferral_patterns: {
+        Row: {
+          category: string
+          commercial_risk: string | null
+          default_severity: string
+          id: string
+          pattern: string
+          recommended_action: string | null
+        }
+        Insert: {
+          category: string
+          commercial_risk?: string | null
+          default_severity?: string
+          id?: string
+          pattern: string
+          recommended_action?: string | null
+        }
+        Update: {
+          category?: string
+          commercial_risk?: string | null
+          default_severity?: string
+          id?: string
+          pattern?: string
+          recommended_action?: string | null
+        }
+        Relationships: []
+      }
+      disciplines: {
+        Row: {
+          code: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          code: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          code?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      drawing_items: {
+        Row: {
+          allocated_trade_code: string | null
+          allocation_status: string | null
+          bbox: Json | null
+          colour: string | null
+          commercial_risk: string | null
+          created_at: string
+          deferral_category: string | null
+          deferred_to: string | null
+          drawing_id: string
+          font_size: number | null
+          id: string
+          is_red: boolean
+          item_type: string
+          owner_id: string
+          page_number: number
+          project_id: string
+          raw_text: string
+          recommended_action: string | null
+          region: string | null
+          severity: string | null
+        }
+        Insert: {
+          allocated_trade_code?: string | null
+          allocation_status?: string | null
+          bbox?: Json | null
+          colour?: string | null
+          commercial_risk?: string | null
+          created_at?: string
+          deferral_category?: string | null
+          deferred_to?: string | null
+          drawing_id: string
+          font_size?: number | null
+          id?: string
+          is_red?: boolean
+          item_type?: string
+          owner_id: string
+          page_number?: number
+          project_id: string
+          raw_text: string
+          recommended_action?: string | null
+          region?: string | null
+          severity?: string | null
+        }
+        Update: {
+          allocated_trade_code?: string | null
+          allocation_status?: string | null
+          bbox?: Json | null
+          colour?: string | null
+          commercial_risk?: string | null
+          created_at?: string
+          deferral_category?: string | null
+          deferred_to?: string | null
+          drawing_id?: string
+          font_size?: number | null
+          id?: string
+          is_red?: boolean
+          item_type?: string
+          owner_id?: string
+          page_number?: number
+          project_id?: string
+          raw_text?: string
+          recommended_action?: string | null
+          region?: string | null
+          severity?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drawing_items_allocated_trade_code_fkey"
+            columns: ["allocated_trade_code"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "drawing_items_drawing_id_fkey"
+            columns: ["drawing_id"]
+            isOneToOne: false
+            referencedRelation: "drawings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drawings: {
+        Row: {
+          analysed_at: string | null
+          body_text_count: number | null
+          cloned_from_drawing_id: string | null
+          coordinate_frame_ok: boolean | null
+          created_at: string
+          discipline_code: string | null
+          drawing_client: string | null
+          drawing_date: string | null
+          drawing_number: string | null
+          drawing_scale: string | null
+          drawing_type: string | null
+          error_message: string | null
+          file_hash: string
+          file_name: string
+          id: string
+          issue_status: string | null
+          layers_present: string[] | null
+          notes_strip_source: string | null
+          originator: string | null
+          owner_id: string
+          page_height: number | null
+          page_rotation: number | null
+          page_width: number | null
+          path_count: number | null
+          project_id: string
+          revision: string | null
+          status: string
+          storage_path: string
+          text_span_count: number | null
+          title: string | null
+          triage_class: string | null
+        }
+        Insert: {
+          analysed_at?: string | null
+          body_text_count?: number | null
+          cloned_from_drawing_id?: string | null
+          coordinate_frame_ok?: boolean | null
+          created_at?: string
+          discipline_code?: string | null
+          drawing_client?: string | null
+          drawing_date?: string | null
+          drawing_number?: string | null
+          drawing_scale?: string | null
+          drawing_type?: string | null
+          error_message?: string | null
+          file_hash: string
+          file_name: string
+          id?: string
+          issue_status?: string | null
+          layers_present?: string[] | null
+          notes_strip_source?: string | null
+          originator?: string | null
+          owner_id: string
+          page_height?: number | null
+          page_rotation?: number | null
+          page_width?: number | null
+          path_count?: number | null
+          project_id: string
+          revision?: string | null
+          status?: string
+          storage_path: string
+          text_span_count?: number | null
+          title?: string | null
+          triage_class?: string | null
+        }
+        Update: {
+          analysed_at?: string | null
+          body_text_count?: number | null
+          cloned_from_drawing_id?: string | null
+          coordinate_frame_ok?: boolean | null
+          created_at?: string
+          discipline_code?: string | null
+          drawing_client?: string | null
+          drawing_date?: string | null
+          drawing_number?: string | null
+          drawing_scale?: string | null
+          drawing_type?: string | null
+          error_message?: string | null
+          file_hash?: string
+          file_name?: string
+          id?: string
+          issue_status?: string | null
+          layers_present?: string[] | null
+          notes_strip_source?: string | null
+          originator?: string | null
+          owner_id?: string
+          page_height?: number | null
+          page_rotation?: number | null
+          page_width?: number | null
+          path_count?: number | null
+          project_id?: string
+          revision?: string | null
+          status?: string
+          storage_path?: string
+          text_span_count?: number | null
+          title?: string | null
+          triage_class?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drawings_cloned_from_drawing_id_fkey"
+            columns: ["cloned_from_drawing_id"]
+            isOneToOne: false
+            referencedRelation: "drawings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      interface_rules: {
         Row: {
           id: string
+          note: string | null
+          topic: string
+          trade_a: string | null
+          trade_b: string | null
         }
         Insert: {
           id?: string
+          note?: string | null
+          topic: string
+          trade_a?: string | null
+          trade_b?: string | null
         }
         Update: {
           id?: string
+          note?: string | null
+          topic?: string
+          trade_a?: string | null
+          trade_b?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interface_rules_trade_a_fkey"
+            columns: ["trade_a"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "interface_rules_trade_b_fkey"
+            columns: ["trade_b"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          client: string | null
+          created_at: string
+          id: string
+          name: string
+          owner_id: string
+          project_reference: string | null
+        }
+        Insert: {
+          client?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          owner_id: string
+          project_reference?: string | null
+        }
+        Update: {
+          client?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string
+          project_reference?: string | null
         }
         Relationships: []
+      }
+      system_code_prefixes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          prefix: string
+          project_id: string | null
+          scope: string
+          trade_code: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          prefix: string
+          project_id?: string | null
+          scope?: string
+          trade_code?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          prefix?: string
+          project_id?: string | null
+          scope?: string
+          trade_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_code_prefixes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "system_code_prefixes_trade_code_fkey"
+            columns: ["trade_code"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      trade_cues: {
+        Row: {
+          cue: string
+          id: string
+          trade_code: string
+          weight: number
+        }
+        Insert: {
+          cue: string
+          id?: string
+          trade_code: string
+          weight?: number
+        }
+        Update: {
+          cue?: string
+          id?: string
+          trade_code?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_cues_trade_code_fkey"
+            columns: ["trade_code"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      trades: {
+        Row: {
+          code: string
+          discipline_code: string | null
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          code: string
+          discipline_code?: string | null
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          code?: string
+          discipline_code?: string | null
+          name?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trades_discipline_code_fkey"
+            columns: ["discipline_code"]
+            isOneToOne: false
+            referencedRelation: "disciplines"
+            referencedColumns: ["code"]
+          },
+        ]
       }
     }
     Views: {
