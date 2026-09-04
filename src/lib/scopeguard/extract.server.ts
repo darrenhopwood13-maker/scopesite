@@ -56,8 +56,8 @@ function ensureWorker(pdfjs: any): void {
 }
 
 export async function extractDrawing(data: Uint8Array): Promise<ExtractResult> {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  await ensureWorker(pdfjs);
+  const pdfjs = pdfjsLib;
+  ensureWorker(pdfjs);
   const { getDocument, OPS, Util } = pdfjs as unknown as {
     getDocument: (args: Record<string, unknown>) => { promise: Promise<any> };
     OPS: Record<string, number>;
