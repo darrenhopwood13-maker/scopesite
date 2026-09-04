@@ -32,6 +32,8 @@ export const analyseDrawing = createServerFn({ method: "POST" })
 
     try {
       await supabase.from("drawings").update({ status: "reading", error_message: null }).eq("id", drawing.id);
+      // Re-reading a sheet replaces its findings; it never adds a second set.
+      await supabase.from("drawing_items").delete().eq("drawing_id", drawing.id);
 
       // Same fingerprint already read in this project: clone, never re-read.
       const { data: twin } = await supabase
@@ -85,34 +87,11 @@ export const analyseDrawing = createServerFn({ method: "POST" })
 
       const findings = detectDeferrals(extract.items, (patterns ?? []) as DeferralPattern[]);
 
-      if (findings.length) {
-        const { error } = await supabase.from("drawing_items").insert(
-          findings.map((f) => ({
-            ...stamp,
-            item_type: "deferral",
-            raw_text: f.raw_text,
-            region: f.region,
-            page_number: 1,
-            bbox: f.bbox,
-            colour: f.colour,
-            font_size: f.font_size,
-            is_red: f.is_red,
-            deferral_category: f.deferral_category,
-            deferred_to: f.deferred_to,
-            severity: f.severity,
-            commercial_risk: f.commercial_risk,
-            recommended_action: f.recommended_action,
-            method: f.method,
-          })),
-        );
-        if (error) return await fail(`Could not record findings: ${error.message}`);
-      }
-
-      await supabase
+      // Write what the sheet says about itself first, so the titleblock and
+      // triage survive even if recording the findings fails.
+      const { error: metaError } = await supabase
         .from("drawings")
         .update({
-          status: "complete",
-          error_message: null,
           triage_class: extract.triage_class,
           text_span_count: extract.text_span_count,
           body_text_count: extract.body_text_count,
@@ -133,11 +112,43 @@ export const analyseDrawing = createServerFn({ method: "POST" })
           issue_status: extract.titleblock.issue_status,
           drawing_type: extract.titleblock.drawing_type,
           discipline_code: extract.titleblock.discipline_code,
-          analysed_at: new Date().toISOString(),
         })
         .eq("id", drawing.id);
+      if (metaError) return await fail(`Could not record the drawing details: ${metaError.message}`);
+
+      if (findings.length) {
+        // also_categories was added after the generated types were last refreshed.
+        const { error } = await supabase.from("drawing_items").insert(
+          findings.map((f) => ({
+            ...stamp,
+            item_type: "deferral",
+            raw_text: f.raw_text,
+            region: f.region,
+            page_number: 1,
+            bbox: f.bbox,
+            colour: f.colour,
+            font_size: f.font_size,
+            is_red: f.is_red,
+            deferral_category: f.deferral_category,
+            also_categories: f.also_categories,
+            deferred_to: f.deferred_to,
+            severity: f.severity,
+            commercial_risk: f.commercial_risk,
+            recommended_action: f.recommended_action,
+            method: f.method,
+          })) as never,
+        );
+        if (error) return await fail(`Could not record findings: ${error.message}`);
+      }
+
+      const { error: doneError } = await supabase
+        .from("drawings")
+        .update({ status: "complete", error_message: null, analysed_at: new Date().toISOString() })
+        .eq("id", drawing.id);
+      if (doneError) return await fail(`Could not finish the reading: ${doneError.message}`);
 
       return { status: "complete" as const, cloned: false, items: findings.length };
+
     } catch (error) {
       // Fail closed: status failed, error recorded, no partial findings kept.
       await supabase.from("drawing_items").delete().eq("drawing_id", drawing.id);

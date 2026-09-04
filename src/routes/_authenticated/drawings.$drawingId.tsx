@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { analyseDrawing } from "@/lib/scopeguard/analyse.functions";
 import { Wordmark } from "@/components/Wordmark";
 import { Disclaimer } from "@/components/Disclaimer";
 
@@ -30,6 +33,12 @@ const SEVERITY_STYLES: Record<string, string> = {
   medium: "text-severity-medium",
   low: "text-severity-low",
 };
+
+// Added after the generated database types were last refreshed.
+function alsoMatches(item: unknown): string[] {
+  const v = (item as { also_categories?: string[] | null }).also_categories;
+  return (v ?? []).map((c) => c.replace(/_/g, " "));
+}
 
 function DrawingPage() {
   const { drawingId } = Route.useParams();
@@ -61,6 +70,18 @@ function DrawingPage() {
     },
   });
 
+  const runAnalysis = useServerFn(analyseDrawing);
+  const [reading, setReading] = useState(false);
+  const readAgain = async () => {
+    setReading(true);
+    try {
+      await runAnalysis({ data: { drawingId } });
+      await Promise.all([drawing.refetch(), items.refetch()]);
+    } finally {
+      setReading(false);
+    }
+  };
+
   const exportXlsx = async () => {
     const XLSX = await import("xlsx");
     const rows = (items.data ?? []).map((i) => ({
@@ -69,7 +90,7 @@ function DrawingPage() {
       Finding: i.raw_text,
       Source: i.region ?? "",
       "Deferred to": i.deferred_to ?? "Not named",
-      "Commercial risk": i.commercial_risk ?? "",
+      "Also matches": alsoMatches(i).join(", "),
       Action: i.recommended_action ?? "",
       "Red text": i.is_red ? "Yes" : "No",
     }));
@@ -132,6 +153,14 @@ function DrawingPage() {
         <h2 className="font-display text-2xl">
           Deferrals ({items.data?.length ?? 0})
         </h2>
+        <div className="flex gap-3">
+        <button
+          onClick={readAgain}
+          disabled={reading}
+          className="rounded-md border border-border px-4 py-2 text-sm font-medium disabled:opacity-50"
+        >
+          {reading ? "Reading…" : "Read again"}
+        </button>
         <button
           onClick={exportXlsx}
           disabled={!items.data?.length}
@@ -139,6 +168,7 @@ function DrawingPage() {
         >
           Export to Excel
         </button>
+        </div>
       </div>
 
       <Disclaimer />
@@ -172,8 +202,8 @@ function DrawingPage() {
                 <dd>{i.deferred_to ?? "Not named on the drawing"}</dd>
               </div>
               <div className="flex gap-2">
-                <dt className="text-muted-foreground">Commercial risk</dt>
-                <dd>{i.commercial_risk ?? "—"}</dd>
+                <dt className="text-muted-foreground">Also matches</dt>
+                <dd>{alsoMatches(i).join(", ") || "—"}</dd>
               </div>
               <div className="flex gap-2">
                 <dt className="text-muted-foreground">Action</dt>

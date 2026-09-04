@@ -124,7 +124,17 @@ export async function extractDrawing(data: Uint8Array): Promise<ExtractResult> {
     ? "titleblock_border"
     : "fixed_28_percent";
 
-  const merged = mergeVertical(mergeHorizontal(spans));
+  const hLines = mergeHorizontal(spans);
+
+  // Numbered general notes: a marker such as "8." sits to the left of the first
+  // line of its note. Those lines must never fold into the note above.
+  const markers = hLines.filter((l) => /^\d{1,2}[.)]$/.test(l.str.trim()));
+  const startsNewBlock = (s: Span) =>
+    markers.some(
+      (m) => Math.abs(m.y - s.y) <= 1.5 && m.x < s.x && s.x - (m.x + m.width) < 20,
+    );
+
+  const merged = mergeVertical(hLines, startsNewBlock);
 
   const items: Array<{ item: MergedItem; region: Region }> = merged.map((item) => {
     let region: Region = item.x >= notesStripX ? "notes" : "body";
@@ -156,7 +166,7 @@ export async function extractDrawing(data: Uint8Array): Promise<ExtractResult> {
     layers = [];
   }
 
-  const revisionScanLines = mergeHorizontal(spans).map((s) => ({
+  const revisionScanLines = hLines.map((s) => ({
     str: s.str,
     x: s.x,
     y: s.y,

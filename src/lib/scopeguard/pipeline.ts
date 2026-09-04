@@ -32,6 +32,7 @@ export type Finding = {
   font_size: number;
   is_red: boolean;
   deferral_category: string;
+  also_categories: string[];
   deferred_to: string | null;
   severity: "high" | "medium" | "low";
   commercial_risk: string | null;
@@ -338,6 +339,14 @@ export function extractDeferredTo(text: string): string | null {
   return party;
 }
 
+const PARTY_WORDS =
+  /(specialist|consultant|architect|engineer|designer|contractor|sub-?contractor|tenant|landlord|client|employer|manufacturer|supplier|authority|surveyor)/i;
+
+// Does the note name anybody at all to carry the item?
+export function namesAParty(text: string): boolean {
+  return PARTY_WORDS.test(text);
+}
+
 export function isRedish(hex: string): boolean {
   if (!/^[0-9a-f]{6}$/i.test(hex)) return false;
   const r = parseInt(hex.slice(0, 2), 16);
@@ -346,10 +355,20 @@ export function isRedish(hex: string): boolean {
   return r > 150 && g < 90 && b < 90;
 }
 
-// A merged notes block can hold a whole general-notes list. Findings must quote
-// one note, so split a block into sentences and test each one.
+// A merged notes block may still hold more than one note. The general notes
+// list is numbered, so split on the note numbering first; sentence punctuation
+// is only a fallback for a long unnumbered block.
 export function splitNotes(text: string): string[] {
-  const raw = text
+  const t = text.trim();
+
+  const numbered = t.split(/\s(?=\d{1,2}[.)]\s)/).map((s) => s.trim()).filter(Boolean);
+  if (numbered.length > 1 && numbered.filter((s) => /^\d{1,2}[.)]\s/.test(s)).length > 1) {
+    return numbered.map((s) => s.replace(/^\d{1,2}[.)]\s*/, "").trim()).filter((s) => s.length >= 8);
+  }
+
+  if (t.length <= 400) return [t];
+
+  const raw = t
     .split(/(?<=[.;])\s+(?=[A-Z0-9])/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
@@ -363,8 +382,9 @@ export function splitNotes(text: string): string[] {
     else parts.push(p);
   }
   const kept = parts.filter((s) => s.length >= 8);
-  return kept.length ? kept : [text.trim()];
+  return kept.length ? kept : [t];
 }
+
 
 
 export function detectDeferrals(
@@ -381,42 +401,60 @@ export function detectDeferrals(
   }
 
   const findings: Finding[] = [];
-  const seen = new Set<string>();
+  const seen = new Map<string, Finding>();
+  const rank = { high: 0, medium: 1, low: 2 } as const;
 
   for (const { item, region } of items) {
     if (region === "titleblock") continue;
     const isRed = isRedish(item.colour);
 
     for (const text of splitNotes(item.str)) {
-    if (text.length < 8) continue;
-    for (const { p, re } of compiled) {
-      if (!re.test(text)) continue;
-      const key = `${p.category}::${text.toLowerCase()}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
+      if (text.length < 8) continue;
+      const matches = compiled.filter(({ re }) => re.test(text));
+      if (!matches.length) continue;
 
       const deferredTo = extractDeferredTo(text);
-      let severity = (p.default_severity as Finding["severity"]) ?? "medium";
-      if (!deferredTo) severity = "high";
-      if (isRed) severity = "high";
+      const partyNamed = deferredTo !== null || namesAParty(text);
 
-      findings.push({
+      // One finding per source sentence, carrying the strongest classification.
+      let best: { p: DeferralPattern; severity: Finding["severity"] } | null = null;
+      const categories = new Set<string>();
+      for (const { p } of matches) {
+        categories.add(p.category);
+        let severity = (p.default_severity as Finding["severity"]) ?? "medium";
+        // Performance requirements and generic "refer to" pointers only reach
+        // high when the note names nobody to carry them.
+        const generic = p.category === "performance_req" || /\brefer to\b/i.test(text);
+        if (generic && partyNamed && rank[severity] < rank["medium"]) severity = "medium";
+        if (!partyNamed) severity = "high";
+        if (isRed) severity = "high";
+        if (!best || rank[severity] < rank[best.severity]) best = { p, severity };
+      }
+      if (!best) continue;
+
+      const key = text.toLowerCase();
+      if (seen.has(key)) continue;
+
+      const finding: Finding = {
         raw_text: text,
         region,
         bbox: { x: item.x, y: item.y, w: item.width, h: item.height },
         colour: item.colour,
         font_size: item.fontSize,
         is_red: isRed,
-        deferral_category: p.category,
+        deferral_category: best.p.category,
+        also_categories: [...categories].filter((c) => c !== best!.p.category),
         deferred_to: deferredTo,
-        severity,
-        commercial_risk: p.commercial_risk,
-        recommended_action: p.recommended_action,
+        severity: best.severity,
+        commercial_risk: best.p.commercial_risk,
+        recommended_action: best.p.recommended_action,
         method: isRed ? "notes_pattern+colour" : "notes_pattern",
-      });
-    }
+      };
+      seen.set(key, finding);
+      findings.push(finding);
     }
   }
+
 
   // Stage 4 — colour flag: red text no pattern caught is still a hold.
   for (const { item, region } of items) {
@@ -432,6 +470,7 @@ export function detectDeferrals(
       font_size: item.fontSize,
       is_red: true,
       deferral_category: "hold_status",
+      also_categories: [],
       deferred_to: extractDeferredTo(text),
       severity: "high",
       commercial_risk: null,
