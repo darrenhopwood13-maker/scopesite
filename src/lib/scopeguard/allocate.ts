@@ -47,7 +47,9 @@ function scoreCues(text: string, cues: TradeCue[]): Map<string, number> {
   for (const c of cues) {
     const needle = ` ${c.cue.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()} `;
     if (needle.trim().length < 3) continue;
-    if (!hay.includes(needle)) continue;
+    // Sheets write "barriers" where the cue says "barrier".
+    const variants = [needle, `${needle.trimEnd()}s `, `${needle.trimEnd()}es `];
+    if (!variants.some((v) => hay.includes(v))) continue;
     scores.set(c.trade_code, (scores.get(c.trade_code) ?? 0) + Number(c.weight ?? 1));
   }
   return scores;
