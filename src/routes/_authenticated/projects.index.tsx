@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Wordmark } from "@/components/Wordmark";
+import { AccountBar } from "@/components/AccountBar";
 import { Disclaimer } from "@/components/Disclaimer";
 
 export const Route = createFileRoute("/_authenticated/projects/")({
@@ -64,15 +64,7 @@ function ProjectsPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10 space-y-10">
-      <div className="flex items-center justify-between">
-        <Wordmark />
-        <button
-          className="text-sm text-muted-foreground hover:text-foreground"
-          onClick={() => supabase.auth.signOut()}
-        >
-          Sign out
-        </button>
-      </div>
+      <AccountBar />
 
       <section className="space-y-4">
         <h1 className="font-display text-3xl">Projects</h1>

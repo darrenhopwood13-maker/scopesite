@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { analyseDrawing } from "@/lib/scopeguard/analyse.functions";
-import { Wordmark } from "@/components/Wordmark";
+import { AccountBar } from "@/components/AccountBar";
 import { Disclaimer } from "@/components/Disclaimer";
 
 export const Route = createFileRoute("/_authenticated/drawings/$drawingId")({
@@ -113,18 +113,17 @@ function DrawingPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10 space-y-8">
-      <div className="flex items-center justify-between">
-        <Wordmark />
+      <AccountBar>
         {d ? (
           <Link
             to="/projects/$projectId"
             params={{ projectId: d.project_id }}
-            className="text-sm text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground"
           >
             Back to project
           </Link>
         ) : null}
-      </div>
+      </AccountBar>
 
       <header className="space-y-2">
         <h1 className="font-display text-3xl">{d?.drawing_number ?? d?.file_name ?? "Drawing"}</h1>
