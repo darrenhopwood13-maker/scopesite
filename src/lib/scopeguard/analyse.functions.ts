@@ -115,6 +115,7 @@ export const analyseDrawing = createServerFn({ method: "POST" })
       if (metaError) return await fail(`Could not record the drawing details: ${metaError.message}`);
 
       if (findings.length) {
+        // also_categories was added after the generated types were last refreshed.
         const { error } = await supabase.from("drawing_items").insert(
           findings.map((f) => ({
             ...stamp,
@@ -133,7 +134,7 @@ export const analyseDrawing = createServerFn({ method: "POST" })
             commercial_risk: f.commercial_risk,
             recommended_action: f.recommended_action,
             method: f.method,
-          })),
+          })) as never,
         );
         if (error) return await fail(`Could not record findings: ${error.message}`);
       }
