@@ -2,11 +2,23 @@
 
 Staged exactly as the brief sets out. Each phase ships and is checked against the two Grafton Street drawings before the next one starts. Nothing from a later phase is built early.
 
+## Before Phase 1 — connect your own backend
+
+The brief requires your own Supabase Pro project, not a managed Lovable backend. I cannot link it from this chat: you connect it yourself in Lovable under Project Settings → Connectors → Supabase (a browser sign-in). Once it is connected I will:
+
+- create the private `drawings` storage bucket,
+- apply the full schema as a migration, and the seed data as a separate migration,
+- deploy the analysis edge functions there,
+- store the AI provider key as an edge function secret.
+
+The front end will only ever use the public key under row-level security. The service key never appears in app code, and no PDF reading or AI call ever happens in the browser.
+
 ## Phase 1 — Foundation and deferrals
 
 What you get: sign in, projects, drawing upload, reading the PDF, honest triage, titleblock details, deferral findings, and an Excel export of them.
 
-- Backend enabled (Lovable Cloud): sign-in by emailed link, private file storage for PDFs, and the full data model from the brief — disciplines, trades, trade cues, deferral patterns, system code prefixes, interface rules, projects, drawings, drawing items, coverage, corroborations. All tables created up front; later phases only fill them.
+- Database on your Supabase project: disciplines, trades, trade cues, deferral patterns, system code prefixes, interface rules, projects, drawings, drawing items, coverage, corroborations. All tables created up front; later phases only fill them.
+
 - Seeded reference data: all 10 disciplines, all 34 trades, all deferral patterns, all 10 system prefixes, all 15 interface rules, and the cue list — expanded beyond the brief so every trade has cues, not just the validated subset.
 - Every project's data is private to the account that owns it. Reference lists are readable by signed-in users and editable by nobody.
 - Upload screen: drag and drop one or many PDFs, duplicate detection by file fingerprint.
@@ -45,8 +57,10 @@ instructSite styling: dark navy console, blue and orange accents on white. Profe
 
 ## Technical notes
 
-- Stack is TanStack Start, so the analysis runs as a server function (`POST`-style typed call) rather than an edge function; behaviour is identical to the brief's pipeline. `pdfjs-dist` handles text extraction with coordinates and colours in the server runtime.
-- Storage is a private bucket; PDFs served through signed URLs.
-- Phase 4 uses the Lovable AI gateway with a strict JSON schema and the brief's system prompt.
+- All extraction and analysis runs as Supabase Edge Functions on your project (`analyse-drawing`, project-level corroboration), using `pdfjs-dist` in Deno for text with coordinates, colours and font sizes. No PDF work in the browser.
+- Schema and seed data applied as migrations on your project; migrations are the only way schema changes are made.
+- Private `drawings` bucket; PDFs read via signed URLs, uploads scoped per user.
+- Phase 4 calls the AI provider from an edge function using a key held as an edge function secret, with a strict JSON schema and the brief's system prompt.
+
 - Superseded revisions retained; nothing deleted.
 - Out of scope throughout: BIM/IFC, clash detection, cost or programme data, OCR/vision of geometry, RFI issue, any claim of compliance or approval.
