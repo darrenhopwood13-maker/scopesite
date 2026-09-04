@@ -106,10 +106,9 @@
   --sidebar-accent-foreground: oklch(0.94 0.006 250);
   --sidebar-border: oklch(0.33 0.032 253);
   --sidebar-ring: oklch(0.62 0.165 255);
-  --font-display: "Archivo", system-ui, sans-serif;
-  --font-body: "IBM Plex Sans", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
+
+
 
 
 @layer base {
