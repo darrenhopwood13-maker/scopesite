@@ -33,10 +33,19 @@ export const analyseDrawing = createServerFn({ method: "POST" })
       return { status: DRAWING_STATUS.failed, error: message, items: 0 };
     };
 
+    // Replacement is the LAST step. Existing findings stay untouched until a
+    // complete new set has been built, so a failed read never wipes good data.
+    const replaceItems = async (rows: Array<Record<string, unknown>>) => {
+      const { error: delError } = await supabase.from("drawing_items").delete().eq("drawing_id", drawing.id);
+      if (delError) throw new Error(`Could not clear the previous findings: ${delError.message}`);
+      if (!rows.length) return;
+      const { error } = await supabase.from("drawing_items").insert(rows as never);
+      if (error) throw new Error(`Could not record findings: ${error.message}`);
+    };
+
     try {
       await supabase.from("drawings").update({ status: DRAWING_STATUS.reading, error_message: null }).eq("id", drawing.id);
-      // Re-reading a sheet replaces its findings; it never adds a second set.
-      await supabase.from("drawing_items").delete().eq("drawing_id", drawing.id);
+
 
       // Same fingerprint already read in this project: clone, never re-read.
       const { data: twin } = await supabase
@@ -58,13 +67,9 @@ export const analyseDrawing = createServerFn({ method: "POST" })
           .eq("drawing_id", twin.id);
         const twinItems = (twinItemRows ?? []) as unknown as Array<Record<string, unknown>>;
 
-        if (twinItems.length) {
-          const { error } = await supabase
-            .from("drawing_items")
-            .insert(twinItems.map((row) => ({ ...row, ...stamp })) as never);
+        // Rows are built first; only then does the previous set get replaced.
+        await replaceItems(twinItems.map((row) => ({ ...row, ...stamp })));
 
-          if (error) return await fail(`Clone failed: ${error.message}`);
-        }
 
         const { id: _twinId, ...twinFields } = twin;
         await supabase
@@ -116,39 +121,10 @@ export const analyseDrawing = createServerFn({ method: "POST" })
       };
 
 
-      // Write what the sheet says about itself first, so the titleblock and
-      // triage survive even if recording the findings fails.
-      const { error: metaError } = await supabase
-        .from("drawings")
-        .update({
-          triage_class: extract.triage_class,
-          text_span_count: extract.text_span_count,
-          body_text_count: extract.body_text_count,
-          path_count: extract.path_count,
-          layers_present: extract.layers_present,
-          page_width: extract.page_width,
-          page_height: extract.page_height,
-          page_rotation: extract.page_rotation,
-          coordinate_frame_ok: extract.coordinate_frame_ok,
-          notes_strip_source: extract.notes_strip_source,
-          drawing_number: extract.titleblock.drawing_number,
-          revision: extract.titleblock.revision,
-          drawing_date: extract.titleblock.drawing_date,
-          drawing_scale: extract.titleblock.drawing_scale,
-          title: extract.titleblock.title,
-          drawing_client: extract.titleblock.drawing_client,
-          originator: extract.titleblock.originator,
-          issue_status: extract.titleblock.issue_status,
-          drawing_type: extract.titleblock.drawing_type,
-          discipline_code: extract.titleblock.discipline_code,
-        })
-        .eq("id", drawing.id);
-      if (metaError) return await fail(`Could not record the drawing details: ${metaError.message}`);
-
-      if (findings.length) {
-        // also_categories was added after the generated types were last refreshed.
-        const { error } = await supabase.from("drawing_items").insert(
-          findings.map((f) => {
+      // Everything is built in memory first. Nothing is deleted or written
+      // until the whole new set exists.
+      // also_categories was added after the generated types were last refreshed.
+      const deferralRows = findings.map((f) => {
             const a = allocate(f.raw_text, reference);
             return {
               ...stamp,
@@ -178,11 +154,8 @@ export const analyseDrawing = createServerFn({ method: "POST" })
               interface_guidance: a.interface_guidance,
               allocation_method: a.allocation_method,
             };
-          }) as never,
-        );
+          });
 
-        if (error) return await fail(`Could not record findings: ${error.message}`);
-      }
 
       // Allocation only ever runs on the body of the sheet. Titleblock text
       // and the standard notes strip name no scope, so they never reach the
@@ -223,12 +196,35 @@ export const analyseDrawing = createServerFn({ method: "POST" })
           };
         });
 
-      if (others.length) {
-        const { error } = await supabase.from("drawing_items").insert(others as never);
-        if (error) return await fail(`Could not record the sheet's annotations: ${error.message}`);
-      }
+      // The new set is complete: now, and only now, replace the old findings.
+      await replaceItems([...deferralRows, ...others]);
 
-
+      const { error: metaError } = await supabase
+        .from("drawings")
+        .update({
+          triage_class: extract.triage_class,
+          text_span_count: extract.text_span_count,
+          body_text_count: extract.body_text_count,
+          path_count: extract.path_count,
+          layers_present: extract.layers_present,
+          page_width: extract.page_width,
+          page_height: extract.page_height,
+          page_rotation: extract.page_rotation,
+          coordinate_frame_ok: extract.coordinate_frame_ok,
+          notes_strip_source: extract.notes_strip_source,
+          drawing_number: extract.titleblock.drawing_number,
+          revision: extract.titleblock.revision,
+          drawing_date: extract.titleblock.drawing_date,
+          drawing_scale: extract.titleblock.drawing_scale,
+          title: extract.titleblock.title,
+          drawing_client: extract.titleblock.drawing_client,
+          originator: extract.titleblock.originator,
+          issue_status: extract.titleblock.issue_status,
+          drawing_type: extract.titleblock.drawing_type,
+          discipline_code: extract.titleblock.discipline_code,
+        })
+        .eq("id", drawing.id);
+      if (metaError) return await fail(`Could not record the drawing details: ${metaError.message}`);
 
       const { error: doneError } = await supabase
         .from("drawings")
@@ -239,8 +235,8 @@ export const analyseDrawing = createServerFn({ method: "POST" })
       return { status: DRAWING_STATUS.complete, cloned: false, items: findings.length };
 
     } catch (error) {
-      // Fail closed: status failed, error recorded, no partial findings kept.
-      await supabase.from("drawing_items").delete().eq("drawing_id", drawing.id);
+      // Fail closed: status failed and the error recorded, but the previous
+      // findings are left exactly as they were.
       return await fail(error instanceof Error ? error.message : String(error));
     }
   });

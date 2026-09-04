@@ -1,4 +1,9 @@
 // Server-only PDF reading. Never imported by browser code.
+// Both pdf.js and its worker are imported statically so the bundler inlines
+// them into the server bundle. A runtime/dynamic resolution fails in the
+// deployed worker runtime ("No such module '_libs/pdf.worker.mjs'").
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+import * as pdfjsWorkerModule from "pdfjs-dist/legacy/build/pdf.worker.mjs";
 import {
   isAnnotationOnly,
   mergeHorizontal,
@@ -33,8 +38,26 @@ function hex(n: number): string {
   return Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, "0");
 }
 
+// The reader runs server-side. pdf.js otherwise tries to resolve its worker
+// script by path at runtime, which does not exist in the deployed bundle
+// ("No such module '_libs/pdf.worker.mjs'"). Bundling the worker module and
+// handing it over as globalThis.pdfjsWorker keeps everything in-process.
+// The Part B browser viewer needs its own worker setup — do not share this one.
+let workerConfigured = false;
+
+function ensureWorker(pdfjs: any): void {
+  if (workerConfigured) return;
+  const g = globalThis as unknown as { pdfjsWorker?: unknown };
+  g.pdfjsWorker = pdfjsWorkerModule;
+  // Never fetched, because the in-process message handler above wins, but the
+  // getter throws when workerSrc is empty.
+  pdfjs.GlobalWorkerOptions.workerSrc = "pdfjs-dist/legacy/build/pdf.worker.mjs";
+  workerConfigured = true;
+}
+
 export async function extractDrawing(data: Uint8Array): Promise<ExtractResult> {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const pdfjs = pdfjsLib;
+  ensureWorker(pdfjs);
   const { getDocument, OPS, Util } = pdfjs as unknown as {
     getDocument: (args: Record<string, unknown>) => { promise: Promise<any> };
     OPS: Record<string, number>;
