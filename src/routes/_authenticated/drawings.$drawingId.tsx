@@ -108,7 +108,7 @@ function DrawingPage() {
       const order: Record<string, number> = { high: 0, medium: 1, low: 2 };
       return [...data].sort(
         (a, b) => (order[a.severity ?? "low"] ?? 3) - (order[b.severity ?? "low"] ?? 3),
-      ) as Item[];
+      ) as unknown as Item[];
     },
   });
 
