@@ -198,7 +198,31 @@ function valueUnder(lines: TbLine[], label: RegExp): string | null {
   return null;
 }
 
+// Revision history table: a short revision code with a date on the same
+// baseline, to its right. Returns one entry per row found.
+function revisionRows(lines: TbLine[]): Array<{ rev: string; date: string }> {
+  const rows: Array<{ rev: string; date: string }> = [];
+  const codes = lines.filter((l) => /^(P\d{2}|C\d{2}|[A-Z]?\d{1,2})$/i.test(l.str.trim()));
+  for (const code of codes) {
+    const right = lines
+      .filter(
+        (l) =>
+          l !== code &&
+          Math.abs(l.y - code.y) <= 3 &&
+          l.x > code.x &&
+          l.x - code.x < 120 &&
+          /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/.test(l.str.trim()),
+      )
+      .sort((a, b) => a.x - b.x)[0];
+    if (!right) continue;
+    const date = right.str.trim().match(/^(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/)?.[1];
+    if (date) rows.push({ rev: code.str.trim().toUpperCase(), date });
+  }
+  return rows;
+}
+
 export function parseTitleblock(lines: TbLine[]): Titleblock {
+
   const clean = lines
     .map((l) => ({ ...l, str: l.str.trim() }))
     .filter((l) => l.str.length > 0);
