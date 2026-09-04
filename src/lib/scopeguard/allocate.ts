@@ -170,24 +170,34 @@ export function allocate(
 
   // An interface rule always overrides a confident single allocation, and is
   // tested against every item on its own trigger and context terms — an item
-  // that scored no cue at all can still be a junction.
-  const rule = matchRule(text, reference.sheetContext ?? "", reference.rules);
+  // that scored no cue at all can still be a junction. Where two rules fit
+  // equally well the item is more contested, not less: both are shown and
+  // their trades are pooled.
+  const matches = matchRules(text, reference.sheetContext ?? "", reference.rules);
 
-  if (rule) {
+  if (matches.length) {
+    const best = matches[0]!.strength;
+    const winners = matches.filter((m) => m.strength === best);
+    const tradeCodes = [...new Set(winners.flatMap((m) => m.rule.trade_codes ?? []))];
+    const guidance = winners
+      .map((m) => m.rule.guidance)
+      .filter((g): g is string => Boolean(g))
+      .join(" ");
     return {
       ...base,
       allocation_status: "ambiguous",
       allocated_trade_code: null,
-      candidate_trades: rule.trade_codes.map((trade_code) => ({
+      candidate_trades: tradeCodes.map((trade_code) => ({
         trade_code,
         score: scores.find((s) => s.trade_code === trade_code)?.score ?? 0,
       })),
       confidence: null,
-      interface_rule_id: rule.id,
-      interface_guidance: rule.guidance,
+      interface_rule_id: winners[0]!.rule.id,
+      interface_guidance: guidance || null,
       allocation_method: "interface_rule",
     };
   }
+
 
   if (matchedCode) {
     const trade = known.get(matchedCode.prefix.toUpperCase())!;
