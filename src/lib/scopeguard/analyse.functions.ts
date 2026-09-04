@@ -184,6 +184,50 @@ export const analyseDrawing = createServerFn({ method: "POST" })
         if (error) return await fail(`Could not record findings: ${error.message}`);
       }
 
+      // Every other readable annotation on the sheet is allocated too — the
+      // Clear / Contested / Unclaimed tabs cover the whole sheet, not just
+      // the deferrals. Text already carried by a deferral is not repeated.
+      const deferralText = new Set(findings.map((f) => f.raw_text.toLowerCase()));
+      const others = extract.items
+        .filter(({ item, region }) => {
+          const t = item.str.trim();
+          if (region === "titleblock") return false;
+          if (t.length < 8 || isAnnotationOnly(t)) return false;
+          const lower = t.toLowerCase();
+          return ![...deferralText].some((d) => d.includes(lower) || lower.includes(d));
+        })
+        .map(({ item, region }) => {
+          const t = item.str.trim();
+          const a = allocate(t, reference);
+          return {
+            ...stamp,
+            item_type: region === "body" ? ITEM_TYPE.body : ITEM_TYPE.note,
+            raw_text: t,
+            region,
+            page_number: 1,
+            bbox: { x: item.x, y: item.y, w: item.width, h: item.height },
+            bbox_frame: "rotated",
+            colour: item.colour,
+            font_size: item.fontSize,
+            is_red: false,
+            allocation_status: a.allocation_status,
+            allocated_trade_code: a.allocated_trade_code,
+            candidate_trades: a.candidate_trades,
+            confidence: a.confidence,
+            system_code: a.system_code,
+            interface_rule_id: a.interface_rule_id,
+            interface_guidance: a.interface_guidance,
+            allocation_method: a.allocation_method,
+          };
+        });
+
+      if (others.length) {
+        const { error } = await supabase.from("drawing_items").insert(others as never);
+        if (error) return await fail(`Could not record the sheet's annotations: ${error.message}`);
+      }
+
+
+
       const { error: doneError } = await supabase
         .from("drawings")
         .update({ status: DRAWING_STATUS.complete, error_message: null, analysed_at: new Date().toISOString() })
