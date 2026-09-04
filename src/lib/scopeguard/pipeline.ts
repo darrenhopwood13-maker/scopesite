@@ -149,7 +149,7 @@ export function triage(input: {
 /* Titleblock parse                                                    */
 /* ------------------------------------------------------------------ */
 
-const DRAWING_NUMBER = /\b[A-Z]{2,4}(?:-[A-Z0-9]{2,6}){3,6}\b/;
+const DRAWING_NUMBER = /\b[A-Z]{2,4}(?:-[A-Z0-9]{1,6}){3,8}\b/;
 const STATUS_CODE = /\b(?:S[0-7]|A[1-5]|P\d{2}|C\d{2})\b/;
 
 export type Titleblock = {

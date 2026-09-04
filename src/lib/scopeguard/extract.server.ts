@@ -158,7 +158,12 @@ export async function extractDrawing(data: Uint8Array): Promise<ExtractResult> {
 
   const titleblockLines = items
     .filter((i) => i.region !== "body")
-    .map((i) => i.item.str);
+    .map((i) => ({
+      str: i.item.str,
+      x: i.item.x,
+      y: i.item.y,
+      fontSize: i.item.fontSize,
+    }));
 
   return {
     spans,
