@@ -480,10 +480,61 @@ export function splitNotes(text: string): string[] {
 
 
 
+/* ------------------------------------------------------------------ */
+/* Boilerplate and the sheet's own author                              */
+/* ------------------------------------------------------------------ */
+
+// The category the seeded exclusion rows carry in deferral_patterns. They sit
+// alongside the detection patterns so the list can be extended from data.
+export const EXCLUSION_CATEGORY = "boilerplate_exclusion";
+
+function normaliseName(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/\b(ltd|limited|llp|plc|partners|partnership|architects?)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+// A drawing referring back to its own author is not a scope deferral.
+export function isOriginatorParty(party: string | null, originator: string | null | undefined): boolean {
+  if (!party || !originator) return false;
+  const a = normaliseName(party);
+  const b = normaliseName(originator);
+  if (a.length < 3 || b.length < 3) return false;
+  return a === b || a.includes(b) || b.includes(a);
+}
+
+export type DetectOptions = {
+  exclusions?: string[];
+  originator?: string | null;
+};
+
 export function detectDeferrals(
   items: Array<{ item: MergedItem; region: Region }>,
   patterns: DeferralPattern[],
+  options: DetectOptions = {},
 ): Finding[] {
+  const originator = options.originator ?? null;
+  const exclusionRes: RegExp[] = [];
+  for (const p of [...(options.exclusions ?? []), ...patterns.filter((p) => p.category === EXCLUSION_CATEGORY).map((p) => p.pattern)]) {
+    try {
+      exclusionRes.push(new RegExp(p, "i"));
+    } catch {
+      // an unusable pattern is skipped, never guessed at
+    }
+  }
+
+  // Contractual boilerplate carries no scope meaning, and a sheet that only
+  // states its author's name is naming nobody new.
+  const excluded = (text: string): boolean => {
+    if (exclusionRes.some((re) => re.test(text))) return true;
+    if (originator && normaliseName(text) === normaliseName(originator)) return true;
+    return false;
+  };
+
+  patterns = patterns.filter((p) => p.category !== EXCLUSION_CATEGORY);
+
   const compiled: Array<{ p: DeferralPattern; re: RegExp }> = [];
   for (const p of patterns) {
     try {
@@ -502,11 +553,12 @@ export function detectDeferrals(
     const isRed = isRedish(item.colour);
 
     for (const text of splitNotes(item.str)) {
-      if (text.length < 8) continue;
+      if (text.length < 8 || excluded(text)) continue;
       const matches = compiled.filter(({ re }) => re.test(text));
       if (!matches.length) continue;
 
-      const deferredTo = extractDeferredTo(text);
+      const named = extractDeferredTo(text);
+      const deferredTo = isOriginatorParty(named, originator) ? null : named;
       const partyNamed = deferredTo !== null || namesAParty(text);
 
       // One finding per source sentence, carrying the strongest classification.
@@ -554,9 +606,10 @@ export function detectDeferrals(
   for (const { item, region } of items) {
     if (region === "titleblock") continue;
     for (const text of splitNotes(item.str)) {
-      if (text.length < 8) continue;
+      if (text.length < 8 || excluded(text)) continue;
       const named = namedParty(text);
       if (!named) continue;
+      if (isOriginatorParty(named, originator)) continue;
       const key = text.toLowerCase();
       if (seen.has(key)) continue;
       const isRed = isRedish(item.colour);
@@ -585,7 +638,7 @@ export function detectDeferrals(
   for (const { item, region } of items) {
     if (region === "titleblock") continue;
     const text = item.str.trim();
-    if (text.length < 8 || !isRedish(item.colour)) continue;
+    if (text.length < 8 || !isRedish(item.colour) || excluded(text)) continue;
     if (findings.some((f) => text.includes(f.raw_text) || f.raw_text.includes(text))) continue;
     findings.push({
       raw_text: text,
@@ -596,7 +649,7 @@ export function detectDeferrals(
       is_red: true,
       deferral_category: "hold_status",
       also_categories: [],
-      deferred_to: extractDeferredTo(text),
+      deferred_to: isOriginatorParty(extractDeferredTo(text), originator) ? null : extractDeferredTo(text),
       severity: "high",
       commercial_risk: null,
       recommended_action:
