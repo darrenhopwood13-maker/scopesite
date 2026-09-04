@@ -33,10 +33,19 @@ export const analyseDrawing = createServerFn({ method: "POST" })
       return { status: DRAWING_STATUS.failed, error: message, items: 0 };
     };
 
+    // Replacement is the LAST step. Existing findings stay untouched until a
+    // complete new set has been built, so a failed read never wipes good data.
+    const replaceItems = async (rows: Array<Record<string, unknown>>) => {
+      const { error: delError } = await supabase.from("drawing_items").delete().eq("drawing_id", drawing.id);
+      if (delError) throw new Error(`Could not clear the previous findings: ${delError.message}`);
+      if (!rows.length) return;
+      const { error } = await supabase.from("drawing_items").insert(rows as never);
+      if (error) throw new Error(`Could not record findings: ${error.message}`);
+    };
+
     try {
       await supabase.from("drawings").update({ status: DRAWING_STATUS.reading, error_message: null }).eq("id", drawing.id);
-      // Re-reading a sheet replaces its findings; it never adds a second set.
-      await supabase.from("drawing_items").delete().eq("drawing_id", drawing.id);
+
 
       // Same fingerprint already read in this project: clone, never re-read.
       const { data: twin } = await supabase
