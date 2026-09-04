@@ -170,14 +170,15 @@ function DrawingPage() {
 
   const knownPrefixes = new Set((prefixes.data ?? []).map((p) => p.prefix.toUpperCase()));
 
-  const correct = async (id: string, patch: Record<string, unknown>) => {
+  const correct = async (ids: string[], patch: Record<string, unknown>) => {
     const { data: session } = await supabase.auth.getUser();
     await supabase
       .from("drawing_items")
       .update({ ...patch, corrected_at: new Date().toISOString(), corrected_by: session.user?.id } as never)
-      .eq("id", id);
+      .in("id", ids);
     await items.refetch();
   };
+
 
   const teachPrefix = async (prefix: string, tradeCode: string) => {
     if (!drawing.data) return;
