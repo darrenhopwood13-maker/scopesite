@@ -33,6 +33,9 @@ Failure display on the drawing page keeps the existing behaviour and makes it ex
 
 - Foster: 10 deferrals, `notes_only`, Rev 02 / 11/03/2024.
 - Veretec: 4 deferrals, 14 contested, 16 clear, 3 unclaimed, `annotation_rich`, Rev P01 / 11/06/25.
-- A deliberately failed read leaves the previous findings in place.
+- A deliberately failed read leaves the previous findings in place, and the drawing page shows them
+  labelled as coming from an earlier read, alongside the failure banner.
+- A successful read straight after that failure replaces those findings cleanly and clears the error
+  banner and stored error message, so no stale results or stale banner remain.
 
 Part B (the drawing viewer) does not start until both sheets read cleanly.
