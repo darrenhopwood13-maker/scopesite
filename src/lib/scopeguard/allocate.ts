@@ -53,12 +53,19 @@ function scoreCues(text: string, cues: TradeCue[]): Map<string, number> {
   return scores;
 }
 
-function matchRule(text: string, rules: InterfaceRule[]): InterfaceRule | null {
+function matchRule(text: string, sheetContext: string, rules: InterfaceRule[]): InterfaceRule | null {
   const hay = ` ${text.toLowerCase().replace(/[^a-z0-9]+/g, " ")} `;
-  const has = (term: string) => hay.includes(` ${term.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()} `);
+  // The junction condition is a property of the sheet, not of one line of
+  // text: an upstand on a facade detail is the facade junction whether or not
+  // the word "facade" appears in that particular annotation. The trigger must
+  // be in the item; the context may come from anywhere on the sheet.
+  const context = ` ${sheetContext.toLowerCase().replace(/[^a-z0-9]+/g, " ")} `;
+  const norm = (term: string) => ` ${term.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()} `;
+  const inItem = (term: string) => hay.includes(norm(term));
+  const inSheet = (term: string) => context.includes(norm(term));
   for (const r of rules) {
-    if (!r.trigger_terms?.some(has)) continue;
-    if (r.context_terms?.length && !r.context_terms.some(has)) continue;
+    if (!r.trigger_terms?.some(inItem)) continue;
+    if (r.context_terms?.length && !r.context_terms.some((t) => inItem(t) || inSheet(t))) continue;
     return r;
   }
   return null;
@@ -66,7 +73,7 @@ function matchRule(text: string, rules: InterfaceRule[]): InterfaceRule | null {
 
 export function allocate(
   text: string,
-  reference: { cues: TradeCue[]; prefixes: CodePrefix[]; rules: InterfaceRule[] },
+  reference: { cues: TradeCue[]; prefixes: CodePrefix[]; rules: InterfaceRule[]; sheetContext?: string },
 ): Allocation {
   const base: Allocation = {
     allocation_status: "unallocated",
@@ -92,7 +99,7 @@ export function allocate(
     .sort((a, b) => b.score - a.score);
 
   // An interface rule always overrides a confident single allocation.
-  const rule = matchRule(text, reference.rules);
+  const rule = matchRule(text, reference.sheetContext ?? "", reference.rules);
   if (rule) {
     return {
       ...base,
