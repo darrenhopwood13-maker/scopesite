@@ -31,6 +31,12 @@ const SEVERITY_STYLES: Record<string, string> = {
   low: "text-severity-low",
 };
 
+// Added after the generated database types were last refreshed.
+function alsoMatches(item: unknown): string[] {
+  const v = (item as { also_categories?: string[] | null }).also_categories;
+  return (v ?? []).map((c) => c.replace(/_/g, " "));
+}
+
 function DrawingPage() {
   const { drawingId } = Route.useParams();
 
@@ -69,7 +75,7 @@ function DrawingPage() {
       Finding: i.raw_text,
       Source: i.region ?? "",
       "Deferred to": i.deferred_to ?? "Not named",
-      "Commercial risk": i.commercial_risk ?? "",
+      "Also matches": alsoMatches(i).join(", "),
       Action: i.recommended_action ?? "",
       "Red text": i.is_red ? "Yes" : "No",
     }));
@@ -172,8 +178,8 @@ function DrawingPage() {
                 <dd>{i.deferred_to ?? "Not named on the drawing"}</dd>
               </div>
               <div className="flex gap-2">
-                <dt className="text-muted-foreground">Commercial risk</dt>
-                <dd>{i.commercial_risk ?? "—"}</dd>
+                <dt className="text-muted-foreground">Also matches</dt>
+                <dd>{alsoMatches(i).join(", ") || "—"}</dd>
               </div>
               <div className="flex gap-2">
                 <dt className="text-muted-foreground">Action</dt>
