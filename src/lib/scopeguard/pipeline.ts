@@ -228,10 +228,22 @@ export function parseTitleblock(lines: TbLine[]): Titleblock {
     joined.match(/\b(P\d{2})\b/);
   if (rev?.[1]) tb.revision = rev[1].toUpperCase();
 
-  const dateValue =
-    valueUnder(clean, /^date$/i) ?? valueUnder(clean, /first issue date/i);
-  const date = (dateValue ?? joined).match(/\b(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\b/);
-  if (date?.[1]) tb.drawing_date = date[1];
+  // Revision history rows: "<rev>  <date>  <description>" on one baseline.
+  // The sheet date is the date of the CURRENT revision, never the first row.
+  const revRows = revisionRows(clean);
+  const currentRow = tb.revision
+    ? revRows.find((r) => r.rev === tb.revision)
+    : revRows.slice().sort((a, b) => b.rev.localeCompare(a.rev))[0];
+  if (currentRow) {
+    tb.drawing_date = currentRow.date;
+    if (!tb.revision) tb.revision = currentRow.rev;
+  } else {
+    const dateValue =
+      valueUnder(clean, /^date$/i) ?? valueUnder(clean, /first issue date/i);
+    const date = (dateValue ?? joined).match(/\b(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\b/);
+    if (date?.[1]) tb.drawing_date = date[1];
+  }
+
 
   const scaleValue = valueUnder(clean, /^scale\b.*$/i);
   tb.drawing_scale = scaleValue ?? joined.match(/\b1\s*[:/]\s*\d{1,4}(?:\s*@\s*A\d)?/i)?.[0] ?? null;
