@@ -57,8 +57,10 @@ instructSite styling: dark navy console, blue and orange accents on white. Profe
 
 ## Technical notes
 
-- Stack is TanStack Start, so the analysis runs as a server function (`POST`-style typed call) rather than an edge function; behaviour is identical to the brief's pipeline. `pdfjs-dist` handles text extraction with coordinates and colours in the server runtime.
-- Storage is a private bucket; PDFs served through signed URLs.
-- Phase 4 uses the Lovable AI gateway with a strict JSON schema and the brief's system prompt.
+- All extraction and analysis runs as Supabase Edge Functions on your project (`analyse-drawing`, project-level corroboration), using `pdfjs-dist` in Deno for text with coordinates, colours and font sizes. No PDF work in the browser.
+- Schema and seed data applied as migrations on your project; migrations are the only way schema changes are made.
+- Private `drawings` bucket; PDFs read via signed URLs, uploads scoped per user.
+- Phase 4 calls the AI provider from an edge function using a key held as an edge function secret, with a strict JSON schema and the brief's system prompt.
+
 - Superseded revisions retained; nothing deleted.
 - Out of scope throughout: BIM/IFC, clash detection, cost or programme data, OCR/vision of geometry, RFI issue, any claim of compliance or approval.
