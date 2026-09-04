@@ -43,21 +43,16 @@ function hex(n: number): string {
 // ("No such module '_libs/pdf.worker.mjs'"). Bundling the worker module and
 // handing it over as globalThis.pdfjsWorker keeps everything in-process.
 // The Part B browser viewer needs its own worker setup — do not share this one.
-let workerReady: Promise<void> | undefined;
+let workerConfigured = false;
 
-async function ensureWorker(pdfjs: any): Promise<void> {
-  if (!workerReady) {
-    workerReady = (async () => {
-      const g = globalThis as unknown as { pdfjsWorker?: unknown };
-      if (!g.pdfjsWorker) {
-        g.pdfjsWorker = await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
-      }
-      // Never used because the message handler above is found first, but the
-      // getter throws when it is empty.
-      pdfjs.GlobalWorkerOptions.workerSrc = "pdfjs-dist/legacy/build/pdf.worker.mjs";
-    })();
-  }
-  await workerReady;
+function ensureWorker(pdfjs: any): void {
+  if (workerConfigured) return;
+  const g = globalThis as unknown as { pdfjsWorker?: unknown };
+  g.pdfjsWorker = pdfjsWorkerModule;
+  // Never fetched, because the in-process message handler above wins, but the
+  // getter throws when workerSrc is empty.
+  pdfjs.GlobalWorkerOptions.workerSrc = "pdfjs-dist/legacy/build/pdf.worker.mjs";
+  workerConfigured = true;
 }
 
 export async function extractDrawing(data: Uint8Array): Promise<ExtractResult> {
