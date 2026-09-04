@@ -424,7 +424,7 @@ export function detectDeferrals(
         let severity = (p.default_severity as Finding["severity"]) ?? "medium";
         // Performance requirements and generic "refer to" pointers only reach
         // high when the note names nobody to carry them.
-        const generic = p.category === "performance_req" || /\brefer to\b/i.test(p.pattern);
+        const generic = p.category === "performance_req" || /\brefer to\b/i.test(text);
         if (generic && partyNamed && rank[severity] < rank["medium"]) severity = "medium";
         if (!partyNamed) severity = "high";
         if (isRed) severity = "high";
