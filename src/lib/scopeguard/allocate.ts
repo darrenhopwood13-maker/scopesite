@@ -41,35 +41,72 @@ export function findSystemCodes(text: string): Array<{ code: string; prefix: str
   return out;
 }
 
+/* ---------------------------------------------------------------- */
+/* Term matching                                                      */
+/* ---------------------------------------------------------------- */
+
+const words = (s: string) =>
+  s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(Boolean);
+
+/** True when a and b differ by at most one insertion, deletion or substitution. */
+function withinOneEdit(a: string, b: string): boolean {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  const [s, l] = a.length <= b.length ? [a, b] : [b, a];
+  let i = 0;
+  let j = 0;
+  let edits = 0;
+  while (i < s.length && j < l.length) {
+    if (s[i] === l[j]) {
+      i++;
+      j++;
+      continue;
+    }
+    if (++edits > 1) return false;
+    if (s.length === l.length) i++;
+    j++;
+  }
+  return true;
+}
+
+// Typos in hand-written annotations are normal ("DEFELECTION HEAD"), so a word
+// over six characters may be one edit out. Simple plurals are tolerated too.
+function wordMatches(sheetWord: string, cueWord: string): boolean {
+  if (sheetWord === cueWord) return true;
+  if (sheetWord === `${cueWord}s` || sheetWord === `${cueWord}es`) return true;
+  if (cueWord.length > 6 && withinOneEdit(sheetWord, cueWord)) return true;
+  return false;
+}
+
+/** Does the text contain this term, allowing plurals and single-character typos? */
+export function containsTerm(hayWords: string[], term: string): boolean {
+  const tw = words(term);
+  if (!tw.length) return false;
+  for (let i = 0; i + tw.length <= hayWords.length; i++) {
+    if (tw.every((t, j) => wordMatches(hayWords[i + j]!, t))) return true;
+  }
+  return false;
+}
+
 function scoreCues(text: string, cues: TradeCue[]): Map<string, number> {
-  const hay = ` ${text.toLowerCase().replace(/[^a-z0-9]+/g, " ")} `;
+  const hay = words(text);
   const scores = new Map<string, number>();
   for (const c of cues) {
-    const needle = ` ${c.cue.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()} `;
-    if (needle.trim().length < 3) continue;
-    // Sheets write "barriers" where the cue says "barrier".
-    const variants = [needle, `${needle.trimEnd()}s `, `${needle.trimEnd()}es `];
-    if (!variants.some((v) => hay.includes(v))) continue;
+    if (c.cue.trim().length < 3) continue;
+    if (!containsTerm(hay, c.cue)) continue;
     scores.set(c.trade_code, (scores.get(c.trade_code) ?? 0) + Number(c.weight ?? 1));
   }
   return scores;
 }
 
 function matchRule(text: string, sheetContext: string, rules: InterfaceRule[]): InterfaceRule | null {
-  const hay = ` ${text.toLowerCase().replace(/[^a-z0-9]+/g, " ")} `;
   // The junction condition is a property of the sheet, not of one line of
   // text: an upstand on a facade detail is the facade junction whether or not
   // the word "facade" appears in that particular annotation. The trigger must
   // be in the item; the context may come from anywhere on the sheet.
-  const context = ` ${sheetContext.toLowerCase().replace(/[^a-z0-9]+/g, " ")} `;
-  const norm = (term: string) => ` ${term.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()} `;
-  // Tolerate a simple plural: sheets write "upstands" where the rule says "upstand".
-  const forms = (term: string) => {
-    const n = norm(term);
-    return [n, `${n.trimEnd()}s `, `${n.trimEnd()}es `];
-  };
-  const inItem = (term: string) => forms(term).some((f) => hay.includes(f));
-  const inSheet = (term: string) => forms(term).some((f) => context.includes(f));
+  const hay = words(text);
+  const context = words(sheetContext);
+  const inItem = (term: string) => containsTerm(hay, term);
+  const inSheet = (term: string) => containsTerm(context, term);
   for (const r of rules) {
     if (!r.trigger_terms?.some(inItem)) continue;
     if (r.context_terms?.length && !r.context_terms.some((t) => inItem(t) || inSheet(t))) continue;
@@ -77,6 +114,7 @@ function matchRule(text: string, sheetContext: string, rules: InterfaceRule[]): 
   }
   return null;
 }
+
 
 export function allocate(
   text: string,
