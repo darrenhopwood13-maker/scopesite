@@ -32,6 +32,7 @@ export type Finding = {
   font_size: number;
   is_red: boolean;
   deferral_category: string;
+  also_categories: string[];
   deferred_to: string | null;
   severity: "high" | "medium" | "low";
   commercial_risk: string | null;
@@ -338,6 +339,14 @@ export function extractDeferredTo(text: string): string | null {
   return party;
 }
 
+const PARTY_WORDS =
+  /(specialist|consultant|architect|engineer|designer|contractor|sub-?contractor|tenant|landlord|client|employer|manufacturer|supplier|authority|surveyor)/i;
+
+// Does the note name anybody at all to carry the item?
+export function namesAParty(text: string): boolean {
+  return PARTY_WORDS.test(text);
+}
+
 export function isRedish(hex: string): boolean {
   if (!/^[0-9a-f]{6}$/i.test(hex)) return false;
   const r = parseInt(hex.slice(0, 2), 16);
@@ -461,6 +470,7 @@ export function detectDeferrals(
       font_size: item.fontSize,
       is_red: true,
       deferral_category: "hold_status",
+      also_categories: [],
       deferred_to: extractDeferredTo(text),
       severity: "high",
       commercial_risk: null,
