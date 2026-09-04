@@ -162,14 +162,17 @@ export type Database = {
           bbox: Json | null
           colour: string | null
           commercial_risk: string | null
+          confidence: number | null
           created_at: string
           deferral_category: string | null
+          deferral_pattern_id: string | null
           deferred_to: string | null
           drawing_id: string
           font_size: number | null
           id: string
           is_red: boolean
           item_type: string
+          method: string | null
           owner_id: string
           page_number: number
           project_id: string
@@ -177,6 +180,7 @@ export type Database = {
           recommended_action: string | null
           region: string | null
           severity: string | null
+          system_code: string | null
         }
         Insert: {
           allocated_trade_code?: string | null
@@ -184,14 +188,17 @@ export type Database = {
           bbox?: Json | null
           colour?: string | null
           commercial_risk?: string | null
+          confidence?: number | null
           created_at?: string
           deferral_category?: string | null
+          deferral_pattern_id?: string | null
           deferred_to?: string | null
           drawing_id: string
           font_size?: number | null
           id?: string
           is_red?: boolean
           item_type?: string
+          method?: string | null
           owner_id: string
           page_number?: number
           project_id: string
@@ -199,6 +206,7 @@ export type Database = {
           recommended_action?: string | null
           region?: string | null
           severity?: string | null
+          system_code?: string | null
         }
         Update: {
           allocated_trade_code?: string | null
@@ -206,14 +214,17 @@ export type Database = {
           bbox?: Json | null
           colour?: string | null
           commercial_risk?: string | null
+          confidence?: number | null
           created_at?: string
           deferral_category?: string | null
+          deferral_pattern_id?: string | null
           deferred_to?: string | null
           drawing_id?: string
           font_size?: number | null
           id?: string
           is_red?: boolean
           item_type?: string
+          method?: string | null
           owner_id?: string
           page_number?: number
           project_id?: string
@@ -221,6 +232,7 @@ export type Database = {
           recommended_action?: string | null
           region?: string | null
           severity?: string | null
+          system_code?: string | null
         }
         Relationships: [
           {
@@ -365,25 +377,43 @@ export type Database = {
       }
       interface_rules: {
         Row: {
+          context_terms: string[]
+          guidance: string | null
           id: string
+          name: string | null
           note: string | null
-          topic: string
+          severity: string
+          topic: string | null
           trade_a: string | null
           trade_b: string | null
+          trade_codes: string[]
+          trigger_terms: string[]
         }
         Insert: {
+          context_terms?: string[]
+          guidance?: string | null
           id?: string
+          name?: string | null
           note?: string | null
-          topic: string
+          severity?: string
+          topic?: string | null
           trade_a?: string | null
           trade_b?: string | null
+          trade_codes?: string[]
+          trigger_terms?: string[]
         }
         Update: {
+          context_terms?: string[]
+          guidance?: string | null
           id?: string
+          name?: string | null
           note?: string | null
-          topic?: string
+          severity?: string
+          topic?: string | null
           trade_a?: string | null
           trade_b?: string | null
+          trade_codes?: string[]
+          trigger_terms?: string[]
         }
         Relationships: [
           {
@@ -431,6 +461,7 @@ export type Database = {
       }
       system_code_prefixes: {
         Row: {
+          confidence: number
           created_at: string
           created_by: string | null
           description: string | null
@@ -441,6 +472,7 @@ export type Database = {
           trade_code: string | null
         }
         Insert: {
+          confidence?: number
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -451,6 +483,7 @@ export type Database = {
           trade_code?: string | null
         }
         Update: {
+          confidence?: number
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -480,18 +513,21 @@ export type Database = {
       trade_cues: {
         Row: {
           cue: string
+          cue_type: string
           id: string
           trade_code: string
           weight: number
         }
         Insert: {
           cue: string
+          cue_type?: string
           id?: string
           trade_code: string
           weight?: number
         }
         Update: {
           cue?: string
+          cue_type?: string
           id?: string
           trade_code?: string
           weight?: number
@@ -512,18 +548,21 @@ export type Database = {
           discipline_code: string | null
           name: string
           sort_order: number
+          typical_drawing_types: string[]
         }
         Insert: {
           code: string
           discipline_code?: string | null
           name: string
           sort_order?: number
+          typical_drawing_types?: string[]
         }
         Update: {
           code?: string
           discipline_code?: string | null
           name?: string
           sort_order?: number
+          typical_drawing_types?: string[]
         }
         Relationships: [
           {
