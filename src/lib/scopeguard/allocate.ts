@@ -232,6 +232,10 @@ export function allocate(
     allocation_status: "ambiguous",
     candidate_trades: scores.slice(0, 3),
     confidence: Math.min(0.6, top.score / 2),
+    // A contested row with no action is a dead end, so a score tie says what
+    // to do even where no interface rule applies.
+    interface_guidance: "Two or more trades score equally on this item. Confirm which package carries it.",
     allocation_method: "cue",
+
   };
 }
