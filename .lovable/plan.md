@@ -2,9 +2,13 @@
 
 Staged exactly as the brief sets out. Each phase ships and is checked against the two Grafton Street drawings before the next one starts. Nothing from a later phase is built early.
 
-## Before Phase 1 — connect your own backend
+## Before Phase 1 — two things needed from you
 
-The brief requires your own Supabase Pro project, not a managed Lovable backend. I cannot link it from this chat: you connect it yourself in Lovable under Project Settings → Connectors → Supabase (a browser sign-in). Once it is connected I will:
+1. Connect your own Supabase Pro project. I cannot link it from this chat: you connect it in Lovable under Project Settings → Connectors → Supabase (a browser sign-in).
+2. Upload the two Grafton Street PDFs. The rotation proof and the acceptance check both need the real sheets.
+
+Once the project is connected I will:
+
 
 - create the private `drawings` storage bucket,
 - apply the full schema as a migration, and the seed data as a separate migration,
@@ -13,21 +17,25 @@ The brief requires your own Supabase Pro project, not a managed Lovable backend.
 
 The front end will only ever use the public key under row-level security. The service key never appears in app code, and no PDF reading or AI call ever happens in the browser.
 
-## Phase 1 — Foundation and deferrals
+## Phase 1 — Foundation and deferrals (the only phase being built now)
 
-What you get: sign in, projects, drawing upload, reading the PDF, honest triage, titleblock details, deferral findings, and an Excel export of them.
+What you get: sign in, projects, drawing upload, reading the PDF, honest triage, titleblock details, deferral findings, and an Excel export of them. Work stops at the acceptance check below.
 
 - Database on your Supabase project: disciplines, trades, trade cues, deferral patterns, system code prefixes, interface rules, projects, drawings, drawing items, coverage, corroborations. All tables created up front; later phases only fill them.
-
-- Seeded reference data: all 10 disciplines, all 34 trades, all deferral patterns, all 10 system prefixes, all 15 interface rules, and the cue list — expanded beyond the brief so every trade has cues, not just the validated subset.
-- Every project's data is private to the account that owns it. Reference lists are readable by signed-in users and editable by nobody.
+- Seeded reference data: the 10 disciplines, 34 trades, all deferral patterns, 10 global system prefixes, 15 interface rules, and the cue list exactly as written in the brief. No invented cues.
+- Every project's data is private to the account that owns it. Reference lists are readable by signed-in users and editable by nobody, with one exception: the project owner may add their own project-scoped system prefixes. Global prefix rows stay read-only.
 - Upload screen: drag and drop one or many PDFs, duplicate detection by file fingerprint.
-- Analysis run 1: extract text with positions, colours and sizes; count vector paths; split the sheet into notes strip vs drawing body; classify the sheet as annotation rich / notes only / graphical only / unreadable and say so plainly on screen; merge wrapped lines and split codes; parse the titleblock (number, revision, date, scale, title, client, originator, issue status), recording blanks as blank rather than guessing.
-- Deferral detection over all text, plus the colour rule that flags red text as a high-severity hold.
+- Reading the sheet: page rotation handled first — text positions and page size are confirmed to be in the same frame before anything is split into regions, and this is proved against the Veretec sheet. The notes strip is found from the titleblock border rectangle; the fixed right-hand 28% is only a fallback when no border is detected.
+- Line merging with the stated tolerances: vertically when left edges are within 3pt, the gap is 0–6pt, font sizes within 0.3pt and the colour matches; horizontally on the same baseline when the gap is under 2pt.
+- Triage: annotation rich / notes only / graphical only / unreadable, stated plainly on screen. Never findings from an empty extraction.
+- Titleblock parse: drawing number, revision, date, scale, title, client, originator, issue status, plus drawing type and discipline code (Phase 3 coverage depends on those two). Missing fields recorded as blank, never guessed.
+- Deferral detection over all text, plus the colour rule flagging red text as a high-severity hold. Where no responsible party is named, the party is recorded as blank and the severity raised to high.
+- If extraction fails: the drawing is marked failed with the error recorded and zero items created. Never partial findings.
 - Deferrals screen: severity ordered, each row showing the exact wording, where on the sheet it came from, who it was deferred to, the commercial consequence and the action to take. Advisory disclaimer on screen and on every export.
 - Excel export of the deferrals register.
 
-Check before moving on: Foster + Partners sheet returns at least seven deferrals including the fire specialist note; Veretec sheet returns the red abeyance note as high severity; both titleblocks parse; no finding without quoted evidence.
+Acceptance check, then stop: Foster + Partners sheet returns at least seven deferrals including the fire specialist note; Veretec sheet returns the red abeyance note as high severity; both titleblocks parse including type and discipline; no finding without quoted evidence.
+
 
 ## Phase 2 — Allocation
 
