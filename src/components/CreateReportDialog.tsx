@@ -234,6 +234,7 @@ function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & {
         [report.title],
         [`Project: ${report.projectName}${report.projectClient ? ` — Client: ${report.projectClient}` : ""}`],
         [`Generated: ${formatDate(report.generatedAt)}`],
+        ...(report.headline ? [[report.headline]] : []),
         ["Drawings covered:"],
         ...(report.drawings.length
           ? report.drawings.map((d) => [`${drawingWithRevision(d)}${d.title ? ` — ${d.title}` : ""}`])
