@@ -583,6 +583,7 @@ export type Database = {
           appointed_status: string
           canonical_name: string
           created_at: string
+          disclaimer_note: string | null
           id: string
           merged_into_party_id: string | null
           needs_review: boolean
@@ -597,6 +598,7 @@ export type Database = {
           appointed_status?: string
           canonical_name: string
           created_at?: string
+          disclaimer_note?: string | null
           id?: string
           merged_into_party_id?: string | null
           needs_review?: boolean
@@ -611,6 +613,7 @@ export type Database = {
           appointed_status?: string
           canonical_name?: string
           created_at?: string
+          disclaimer_note?: string | null
           id?: string
           merged_into_party_id?: string | null
           needs_review?: boolean
