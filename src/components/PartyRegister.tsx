@@ -220,6 +220,17 @@ export function PartyRegister({ projectId }: { projectId: string }) {
                   </select>
                 </label>
               </div>
+              {p.disclaimer_note ? (
+                <div className="rounded border-l-2 border-accent bg-muted/40 p-3 text-sm">
+                  <div className="font-display text-foreground">Disclaimer on their drawings</div>
+                  <p className="text-muted-foreground">“{p.disclaimer_note}”</p>
+                  <p className="mt-1 text-muted-foreground">
+                    This party disclaims responsibility for other works and interfaces on every sheet
+                    they issue. Confirm who is coordinating those interfaces.
+                  </p>
+                </div>
+              ) : null}
+
               {p.needs_review ? (
                 <div className="flex flex-wrap items-center gap-3 rounded border border-border/60 bg-muted/40 p-3 text-sm">
                   <span>{p.review_reason}</span>
