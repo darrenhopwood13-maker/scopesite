@@ -680,7 +680,84 @@ export function applySeverityModel(
   return base;
 }
 
+
+/* ------------------------------------------------------------------ */
+/* Red is emphasis unless the words say hold                            */
+/* ------------------------------------------------------------------ */
+
+// Only these words make a note a hold. "No mechanical fixings between" is
+// emphasis, not abeyance.
+export const HOLD_LANGUAGE = new RegExp(
+  [
+    "abeyance",
+    "on hold",
+    "\\bhold\\b",
+    "\\btbc\\b",
+    "to be confirmed",
+    "to be reviewed",
+    "under review",
+    "not for construction",
+    "\\bnfc\\b",
+    "pending (?:approval|review|instruction)",
+    "awaiting (?:approval|instruction|confirmation)",
+  ].join("|"),
+  "i",
+);
+
+// A red note that is not a hold still says something. Classify it by content
+// so it lands in the right place; the colour only lifts its severity.
+export function classifyRedByContent(text: string, partyNamed: boolean): string {
+  if (partyNamed) return "by_others";
+  if (/\b(?:performance|design(?:ed)? by|specialist design|to achieve|in accordance with)\b/i.test(text))
+    return "performance_req";
+  if (/\b(?:movement|tolerance|clearance|between|interface|junction|no\s+(?:mechanical\s+)?fixing|high point|falls?)\b/i.test(text))
+    return "scope_boundary";
+  if (/\b(?:as required|to suit|as necessary|refer to|to be (?:agreed|advised))\b/i.test(text))
+    return "design_deferral";
+  return "scope_boundary";
+}
+
+/* ------------------------------------------------------------------ */
+/* Party disclaimers — boilerplate on the sheet, a finding once            */
+/* ------------------------------------------------------------------ */
+
+// A subcontractor disclaiming responsibility for interfaces and coordination
+// is a real finding, but it is printed on every one of their sheets. It is
+// excluded from the per-sheet deferrals and surfaced once against the party.
+const DISCLAIMER_LANGUAGE = new RegExp(
+  [
+    "produced to emphasise",
+    "works only",
+    "no responsibility (?:is )?(?:accepted|taken)",
+    "accepts? no responsibility",
+    "not responsible for",
+    "excludes? (?:all )?(?:other )?(?:trades|works|interfaces)",
+    "for (?:information|indicative) purposes only",
+  ].join("|"),
+  "i",
+);
+
+export type PartyDisclaimer = { party: string | null; text: string };
+
+export function detectPartyDisclaimers(
+  items: Array<{ item: MergedItem; region: Region }>,
+  originator?: string | null,
+): PartyDisclaimer[] {
+  const out = new Map<string, PartyDisclaimer>();
+  for (const { item, region } of items) {
+    if (region === "titleblock") continue;
+    const text = item.str.replace(/\s+/g, " ").trim();
+    if (text.length < 20 || !DISCLAIMER_LANGUAGE.test(text)) continue;
+    // A disclaimer belongs to whoever wrote it: the sheet's own author.
+    const party = originator ?? namedParty(text) ?? extractDeferredTo(text);
+    const key = text.toLowerCase();
+    if (!out.has(key)) out.set(key, { party, text });
+  }
+  return [...out.values()];
+}
+
 export function detectDeferrals(
+
 
   items: Array<{ item: MergedItem; region: Region }>,
   patterns: DeferralPattern[],
