@@ -194,37 +194,65 @@ export type TopicItem = {
   raw_text: string;
   /** true for deferrals, false for findings where an interface rule fired */
   is_deferral: boolean;
+  /** null where the deferral names no responsible party */
+  party_id?: string | null;
 };
+
+/**
+ * How a topic was corroborated. "deferral" means two or more sheets deferred
+ * the same topic. "contested" means one sheet deferred it and another sheet
+ * detailed the same junction as a contested item — the same gap seen from two
+ * sides, which is weaker evidence and graded accordingly.
+ */
+export type CorroborationMode = "deferral" | "contested";
 
 export type TopicGroup = {
   topic: TopicDef;
   severity: TopicSeverity;
+  mode: CorroborationMode;
   drawing_ids: string[];
   originators: string[];
   /** the deferrals that raised the topic */
   evidence: TopicItem[];
-  /** contested interface findings on the same topic, on the same drawings */
+  /** contested interface findings on the same topic */
   related: TopicItem[];
   item_ids: string[];
 };
 
 /**
  * A drawing joins a topic when a deferral on it matches. Interface findings
- * never raise a topic on their own — they are corroborating detail attached to
- * a topic already deferred on that same sheet. A group is only raised where it
- * spans two or more drawings.
+ * never raise a topic on their own, but a deferral on one sheet plus contested
+ * detail of the same topic on another sheet is corroboration — graded medium
+ * and marked as such, so it reads differently from two consultants deferring.
  */
 export function groupByTopic(items: TopicItem[], topics: TopicDef[] = TOPIC_SEEDS): TopicGroup[] {
   const groups: TopicGroup[] = [];
 
   for (const topic of topics) {
     const evidence = items.filter((i) => i.is_deferral && matchesTopic(i.raw_text, topic));
-    const drawingIds = [...new Set(evidence.map((e) => e.drawing_id))].sort();
-    if (drawingIds.length < 2) continue;
+    const deferralDrawings = [...new Set(evidence.map((e) => e.drawing_id))].sort();
+    if (deferralDrawings.length === 0) continue;
 
-    const related = items.filter(
-      (i) => !i.is_deferral && drawingIds.includes(i.drawing_id) && matchesTopic(i.raw_text, topic),
-    );
+    const relatedAll = items.filter((i) => !i.is_deferral && matchesTopic(i.raw_text, topic));
+
+    let mode: CorroborationMode;
+    let drawingIds: string[];
+    let related: TopicItem[];
+
+    if (deferralDrawings.length >= 2) {
+      mode = "deferral";
+      drawingIds = deferralDrawings;
+      related = relatedAll.filter((r) => drawingIds.includes(r.drawing_id));
+    } else {
+      const elsewhere = relatedAll.filter((r) => !deferralDrawings.includes(r.drawing_id));
+      if (!elsewhere.length) continue;
+      mode = "contested";
+      drawingIds = [
+        ...new Set([...deferralDrawings, ...relatedAll.map((r) => r.drawing_id)]),
+      ].sort();
+      related = relatedAll;
+    }
+
     // A sheet with no recorded originator is not counted as one: it must never
     // inflate the count that drives escalation to high.
     const originators = [
@@ -233,7 +261,9 @@ export function groupByTopic(items: TopicItem[], topics: TopicDef[] = TOPIC_SEED
 
     groups.push({
       topic,
-      severity: originators.length >= 2 ? "high" : topic.severity,
+      severity:
+        mode === "contested" ? "medium" : originators.length >= 2 ? "high" : topic.severity,
+      mode,
       drawing_ids: drawingIds,
       originators,
       evidence,
@@ -282,9 +312,13 @@ export function topicNarrative(group: TopicGroup): string {
     return `  • ${who} defers this on ${sheet(e)}: “${e.raw_text}”`;
   });
   const related = relatedFindingsLine(group.related);
+  const severityLine =
+    group.mode === "contested"
+      ? "Severity: medium — corroborated by contested detail on another drawing, not by a second deferral."
+      : `Severity: ${group.severity}${m >= 2 ? " — the same interface is left open by two or more originators." : "."}`;
   return [
     `${group.topic.name} is left open across ${n} drawing${n === 1 ? "" : "s"} from ${m} originator${m === 1 ? "" : "s"}.`,
-    `Severity: ${group.severity}${m >= 2 ? " — the same interface is left open by two or more originators." : "."}`,
+    severityLine,
     "",
     ...lines,
     ...(related ? ["", related] : []),
@@ -296,5 +330,65 @@ export function topicNarrative(group: TopicGroup): string {
 export function topicSummary(group: TopicGroup): string {
   const n = group.drawing_ids.length;
   const m = group.originators.length;
-  return `${group.topic.name} — ${group.severity} severity, open on ${n} drawing${n === 1 ? "" : "s"} from ${m} originator${m === 1 ? "" : "s"}.`;
+  const how =
+    group.mode === "contested" ? ", corroborated by contested evidence" : "";
+  return `${group.topic.name} — ${group.severity} severity, open on ${n} drawing${n === 1 ? "" : "s"} from ${m} originator${m === 1 ? "" : "s"}${how}.`;
 }
+
+// ── Single-drawing scope vacuum ────────────────────────────────────────────
+// Not a cross-drawing pattern and topic grouping will never catch it: one
+// sheet defers several elements and names nobody at all.
+
+export const UNNAMED_PARTY_THRESHOLD = 4;
+
+export type UnnamedPartyGroup = {
+  drawing_id: string;
+  drawing_number: string | null;
+  revision: string | null;
+  originator: string | null;
+  items: TopicItem[];
+};
+
+export function groupUnnamedParty(
+  items: TopicItem[],
+  threshold: number = UNNAMED_PARTY_THRESHOLD,
+): UnnamedPartyGroup[] {
+  const byDrawing = new Map<string, TopicItem[]>();
+  for (const i of items) {
+    if (!i.is_deferral || i.party_id) continue;
+    byDrawing.set(i.drawing_id, [...(byDrawing.get(i.drawing_id) ?? []), i]);
+  }
+  return [...byDrawing.entries()]
+    .filter(([, list]) => list.length >= threshold)
+    .map(([drawing_id, list]) => ({
+      drawing_id,
+      drawing_number: list[0]?.drawing_number ?? null,
+      revision: list[0]?.revision ?? null,
+      originator: list[0]?.originator ?? null,
+      items: list,
+    }))
+    .sort((a, b) => b.items.length - a.items.length);
+}
+
+export function unnamedPartyTitle(group: UnnamedPartyGroup): string {
+  return `Elements deferred to unnamed parties on ${group.drawing_number ?? "an unnumbered drawing"}`;
+}
+
+export function unnamedPartySummary(group: UnnamedPartyGroup): string {
+  return `This drawing defers ${group.items.length} elements to unnamed parties — high severity.`;
+}
+
+export function unnamedPartyNarrative(group: UnnamedPartyGroup): string {
+  const where = [group.drawing_number ?? "This drawing", group.revision ? `Rev ${group.revision}` : null]
+    .filter(Boolean)
+    .join(" ");
+  return [
+    `${where} defers ${group.items.length} elements to unnamed parties.`,
+    "Severity: high — nobody is named as responsible for any of them on this sheet.",
+    "",
+    ...group.items.map((i) => `  • “${i.raw_text}”`),
+    "",
+    "Each of these needs a named package before it can be priced or built.",
+  ].join("\n");
+}
+
