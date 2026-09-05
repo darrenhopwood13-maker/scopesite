@@ -212,21 +212,48 @@ function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & {
       }
       y += 8;
 
-      if (report.rows.length) {
-        autoTable(doc, {
-          head: [report.columns],
-          body: report.rows,
-          startY: y,
-          margin: { left: margin, right: margin, bottom: 60 },
-          styles: { fontSize: 8, cellPadding: 4, overflow: "linebreak", valign: "top" },
-          headStyles: { fillColor: [238, 240, 244], textColor: 20, fontStyle: "bold" },
-        });
-        y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 18;
+      const drawTable = (columns: string[], rows: string[][], empty: string) => {
+        if (rows.length) {
+          autoTable(doc, {
+            head: [columns],
+            body: rows,
+            startY: y,
+            margin: { left: margin, right: margin, bottom: 60 },
+            styles: { fontSize: 8, cellPadding: 4, overflow: "linebreak", valign: "top" },
+            headStyles: { fillColor: [238, 240, 244], textColor: 20, fontStyle: "bold" },
+          });
+          y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 18;
+        } else {
+          doc.setFont("helvetica", "italic");
+          doc.text(empty, margin, y);
+          doc.setFont("helvetica", "normal");
+          y += 20;
+        }
+      };
+
+      if (report.sections) {
+        for (const section of report.sections) {
+          if (y > doc.internal.pageSize.getHeight() - 120) {
+            doc.addPage();
+            y = margin;
+          }
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(11);
+          doc.text(section.heading, margin, y);
+          y += 13;
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          if (section.note) {
+            for (const line of doc.splitTextToSize(section.note, width - margin * 2) as string[]) {
+              doc.text(line, margin, y);
+              y += 11;
+            }
+          }
+          y += 4;
+          drawTable(section.columns, section.rows, section.emptyMessage);
+        }
       } else {
-        doc.setFont("helvetica", "italic");
-        doc.text(report.emptyMessage, margin, y);
-        doc.setFont("helvetica", "normal");
-        y += 20;
+        drawTable(report.columns, report.rows, report.emptyMessage);
       }
 
       if (y > doc.internal.pageSize.getHeight() - 70) {
@@ -279,10 +306,25 @@ function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & {
         [],
       ];
       const sheet = XLSX.utils.aoa_to_sheet(header);
-      if (report.rows.length) {
-        XLSX.utils.sheet_add_aoa(sheet, [report.columns, ...report.rows], { origin: -1 });
+      const addTable = (section: Pick<ReportSection, "columns" | "rows" | "emptyMessage">) => {
+        if (section.rows.length) {
+          XLSX.utils.sheet_add_aoa(sheet, [section.columns, ...section.rows], { origin: -1 });
+        } else {
+          XLSX.utils.sheet_add_aoa(sheet, [[section.emptyMessage]], { origin: -1 });
+        }
+      };
+      if (report.sections) {
+        for (const section of report.sections) {
+          XLSX.utils.sheet_add_aoa(
+            sheet,
+            section.note ? [[section.heading], [section.note]] : [[section.heading]],
+            { origin: -1 },
+          );
+          addTable(section);
+          XLSX.utils.sheet_add_aoa(sheet, [[]], { origin: -1 });
+        }
       } else {
-        XLSX.utils.sheet_add_aoa(sheet, [[report.emptyMessage]], { origin: -1 });
+        addTable(report);
       }
       XLSX.utils.sheet_add_aoa(sheet, [[], [DISCLAIMER]], { origin: -1 });
       const book = XLSX.utils.book_new();
