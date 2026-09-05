@@ -5,8 +5,11 @@
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import * as pdfjsWorkerModule from "pdfjs-dist/legacy/build/pdf.worker.mjs";
 import {
+  findTitleblockBox,
+  inBox,
   isAnnotationOnly,
   mergeHorizontal,
+
   mergeVertical,
   parseTitleblock,
   triage,
