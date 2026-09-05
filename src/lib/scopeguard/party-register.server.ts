@@ -129,8 +129,40 @@ export async function refreshPartyRegister(
     await db.from("drawing_items").update({ party_id: partyId }).eq("id", item.id);
   }
 
+
+  // A party disclaiming responsibility for interfaces and coordination is a
+  // real finding, but it is printed on every one of their sheets. It is
+  // recorded once against the party rather than repeated per note.
+  for (const d of disclaimers) {
+    if (!d.party) continue;
+    const raw = displayName(d.party);
+    const key = normalisePartyName(raw);
+    if (!key || isGenericPartyTerm(raw) || !isPartyNameLike(raw)) continue;
+    let partyId = parties.find((p) => p.normalised_name === key)?.id ?? null;
+    if (!partyId) {
+      const { data: created } = await db
+        .from("parties")
+        .insert({
+          ...stamp,
+          canonical_name: titleCaseName(raw),
+          normalised_name: key,
+          party_type: inferPartyType(raw),
+          appointed_status: "unknown",
+        })
+        .select("id, canonical_name, normalised_name")
+        .maybeSingle();
+      if (created) {
+        parties.push(created as PartyRecord);
+        partyId = (created as PartyRecord).id;
+      }
+    }
+    if (!partyId) continue;
+    await db.from("parties").update({ disclaimer_note: d.text }).eq("id", partyId);
+  }
+
   await rebuildPartyCorroborationsImpl(db, stamp);
 }
+
 
 export async function rebuildPartyCorroborations(client: unknown, stampArg: Stamp): Promise<void> {
   return rebuildPartyCorroborationsImpl(client as Db, stampArg);
