@@ -302,6 +302,7 @@ export function reportToHtml(report: Report): string {
       report.projectClient ? ` — Client: ${escapeHtml(report.projectClient)}` : ""
     }</p>
     <p class="meta">Generated: ${escapeHtml(formatDate(report.generatedAt))}</p>
+    ${report.headline ? `<p class="headline">${escapeHtml(report.headline)}</p>` : ""}
     <h2>Drawings covered</h2>
     <ul>${coverage}</ul>
     ${body}
