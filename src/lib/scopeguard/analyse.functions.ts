@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { detectDeferrals, isAnnotationOnly, type DeferralPattern } from "./pipeline";
+import { contestedSeverity, detectDeferrals, isAnnotationOnly, type DeferralPattern } from "./pipeline";
 import { allocate, type CodePrefix, type InterfaceRule, type TradeCue } from "./allocate";
 
 import { DRAWING_STATUS, ITEM_TYPE } from "./vocab";
