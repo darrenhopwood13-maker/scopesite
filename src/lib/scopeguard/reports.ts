@@ -157,7 +157,12 @@ type BuildInput = {
   items: ReportItem[];
   parties?: ReportParty[];
   scopeLabel: string;
+  /** Package report only. */
+  trade?: { code: string; name: string } | null;
+  tradeCues?: Array<{ trade_code: string; cue: string }>;
+  tradeNames?: Record<string, string>;
 };
+
 
 export function buildReport(template: ReportTemplate, input: BuildInput): Report {
   const byId = new Map(input.drawings.map((d) => [d.id, d]));
