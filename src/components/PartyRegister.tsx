@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -8,40 +9,74 @@ const db = supabase as unknown as SupabaseClient<any, "public", any>;
 type Party = {
   id: string;
   canonical_name: string;
+  party_type: string;
   appointed_status: string;
   needs_review: boolean;
   review_reason: string | null;
 };
 
+type Alias = { party_id: string; alias: string };
+
 type Corroboration = {
   id: string;
   topic: string;
   severity: string | null;
-  summary: string | null;
-  item_ids: string[];
+  narrative: string | null;
+  status: string;
+  resolved_note: string | null;
+  drawing_count: number;
+  originator_count: number;
   drawing_ids: string[];
   originators: string[];
 };
 
 const STATUS_LABELS: Record<string, string> = {
   unknown: "Not known",
-  appointed: "Appointed",
-  not_appointed: "Not appointed",
+  yes: "Appointed",
+  no: "Not appointed",
 };
+
+const TYPE_LABELS: Record<string, string> = {
+  consultant: "Consultant",
+  specialist_subcontractor: "Specialist subcontractor",
+  client_side: "Client side",
+  supplier: "Supplier",
+  unknown: "Type not known",
+};
+
+const SEVERITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
 export function PartyRegister({ projectId }: { projectId: string }) {
   const qc = useQueryClient();
+
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: ["parties", projectId] });
+    void qc.invalidateQueries({ queryKey: ["party-counts", projectId] });
+    void qc.invalidateQueries({ queryKey: ["party-corroborations", projectId] });
+  };
 
   const parties = useQuery({
     queryKey: ["parties", projectId],
     queryFn: async () => {
       const { data, error } = await db
         .from("parties")
-        .select("id, canonical_name, appointed_status, needs_review, review_reason")
+        .select("id, canonical_name, party_type, appointed_status, needs_review, review_reason")
         .eq("project_id", projectId)
         .order("canonical_name");
       if (error) throw error;
       return (data ?? []) as Party[];
+    },
+  });
+
+  const aliases = useQuery({
+    queryKey: ["party-aliases", projectId],
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("party_aliases")
+        .select("party_id, alias")
+        .eq("project_id", projectId);
+      if (error) throw error;
+      return (data ?? []) as Alias[];
     },
   });
 
@@ -71,12 +106,18 @@ export function PartyRegister({ projectId }: { projectId: string }) {
     queryFn: async () => {
       const { data, error } = await db
         .from("corroborations")
-        .select("id, topic, severity, summary, item_ids, drawing_ids, originators")
+        .select(
+          "id, topic, severity, narrative, status, resolved_note, drawing_count, originator_count, drawing_ids, originators",
+        )
         .eq("project_id", projectId)
-        .eq("kind", "party")
-        .order("severity");
+        .eq("kind", "party");
       if (error) throw error;
-      return (data ?? []) as Corroboration[];
+      return ((data ?? []) as Corroboration[]).sort(
+        (a, b) =>
+          (SEVERITY_ORDER[a.severity ?? ""] ?? 3) - (SEVERITY_ORDER[b.severity ?? ""] ?? 3) ||
+          b.originator_count - a.originator_count ||
+          b.drawing_count - a.drawing_count,
+      );
     },
   });
 
@@ -85,9 +126,18 @@ export function PartyRegister({ projectId }: { projectId: string }) {
       const { error } = await db.from("parties").update({ appointed_status: status }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["parties", projectId] });
+    onSuccess: invalidate,
+  });
+
+  const setCorrStatus = useMutation({
+    mutationFn: async ({ id, status, note }: { id: string; status: string; note: string }) => {
+      const { error } = await db
+        .from("corroborations")
+        .update({ status, resolved_note: note })
+        .eq("id", id);
+      if (error) throw error;
     },
+    onSuccess: invalidate,
   });
 
   const merge = useMutation({
@@ -101,10 +151,7 @@ export function PartyRegister({ projectId }: { projectId: string }) {
       if (error) throw error;
       await db.from("parties").delete().eq("id", id);
     },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["parties", projectId] });
-      void qc.invalidateQueries({ queryKey: ["party-counts", projectId] });
-    },
+    onSuccess: invalidate,
   });
 
   const keepSeparate = useMutation({
@@ -115,10 +162,16 @@ export function PartyRegister({ projectId }: { projectId: string }) {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["parties", projectId] }),
+    onSuccess: invalidate,
   });
 
   const rows = parties.data ?? [];
+  const aliasesByParty = new Map<string, string[]>();
+  for (const a of aliases.data ?? []) {
+    const list = aliasesByParty.get(a.party_id) ?? [];
+    if (a.alias !== rows.find((p) => p.id === a.party_id)?.canonical_name) list.push(a.alias);
+    aliasesByParty.set(a.party_id, list);
+  }
 
   return (
     <section className="space-y-6">
@@ -135,17 +188,25 @@ export function PartyRegister({ projectId }: { projectId: string }) {
           const other = candidate
             ? rows.find((r) => r.canonical_name === candidate && r.id !== p.id)
             : undefined;
+          const aliasList = aliasesByParty.get(p.id) ?? [];
           return (
             <div key={p.id} className="rounded-lg border border-border bg-card p-4 space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="font-display">{p.canonical_name}</div>
                   <div className="text-sm text-muted-foreground">
+                    {TYPE_LABELS[p.party_type] ?? p.party_type}
+                    {" · "}
                     {c ? `${c.items} deferral${c.items === 1 ? "" : "s"} across ${c.drawings.size} drawing${c.drawings.size === 1 ? "" : "s"}` : "No deferrals"}
                   </div>
+                  {aliasList.length ? (
+                    <div className="text-sm text-muted-foreground">
+                      Also written as: {aliasList.join(", ")}
+                    </div>
+                  ) : null}
                 </div>
                 <label className="text-sm text-muted-foreground">
-                  Status{" "}
+                  Appointed{" "}
                   <select
                     value={p.appointed_status}
                     onChange={(e) => setStatus.mutate({ id: p.id, status: e.target.value })}
@@ -193,7 +254,7 @@ export function PartyRegister({ projectId }: { projectId: string }) {
           </p>
         ) : null}
         {(corroborations.data ?? []).map((c) => (
-          <div key={c.id} className="rounded-lg border border-border bg-card p-4 space-y-1">
+          <div key={c.id} className="rounded-lg border border-border bg-card p-4 space-y-2">
             <div className="flex items-center justify-between gap-3">
               <span className="font-display">{c.topic}</span>
               <span
@@ -201,14 +262,61 @@ export function PartyRegister({ projectId }: { projectId: string }) {
                   c.severity === "high" ? "text-sm text-destructive" : "text-sm text-muted-foreground"
                 }
               >
-                {c.severity === "high" ? "High" : "Medium"}
+                {c.severity === "high" ? "High" : c.severity === "medium" ? "Medium" : "Low"}
+                {c.status !== "open" ? ` · ${c.status}` : ""}
               </span>
             </div>
-            <p className="text-sm text-muted-foreground">{c.summary}</p>
+            {c.narrative ? (
+              <p className="whitespace-pre-line text-sm text-muted-foreground">{c.narrative}</p>
+            ) : null}
+            {c.resolved_note ? (
+              <p className="text-sm text-muted-foreground">Note: {c.resolved_note}</p>
+            ) : null}
             <p className="text-sm text-muted-foreground">
-              {c.item_ids.length} deferrals · {c.drawing_ids.length} drawings
+              {c.drawing_count} drawings
               {c.originators.length ? ` · ${c.originators.join(", ")}` : ""}
+              {" · "}
+              {c.drawing_ids.map((id, i) => (
+                <span key={id}>
+                  {i > 0 ? ", " : ""}
+                  <Link to="/drawings/$drawingId" params={{ drawingId: id }} className="underline hover:text-foreground">
+                    drawing {i + 1}
+                  </Link>
+                </span>
+              ))}
             </p>
+            {c.status === "open" ? (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const note = window.prompt("Resolve with a note:");
+                    if (note !== null) setCorrStatus.mutate({ id: c.id, status: "resolved", note });
+                  }}
+                  className="rounded border border-border px-2 py-1 text-sm hover:border-primary"
+                >
+                  Resolve
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const note = window.prompt("Dismiss with a note:");
+                    if (note !== null) setCorrStatus.mutate({ id: c.id, status: "dismissed", note });
+                  }}
+                  className="rounded border border-border px-2 py-1 text-sm hover:border-primary"
+                >
+                  Dismiss
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setCorrStatus.mutate({ id: c.id, status: "open", note: "" })}
+                className="rounded border border-border px-2 py-1 text-sm hover:border-primary"
+              >
+                Reopen
+              </button>
+            )}
           </div>
         ))}
       </div>
