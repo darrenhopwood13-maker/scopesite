@@ -203,26 +203,81 @@ function ProjectPage() {
         {drawings.data?.length === 0 ? (
           <p className="text-muted-foreground">No drawings uploaded yet.</p>
         ) : null}
+
+        {drawings.data?.length ? (
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span className="text-muted-foreground">
+              {selected.size ? `${selected.size} selected` : "Select drawings to remove them"}
+            </span>
+            <button
+              type="button"
+              disabled={!selected.size || deleting}
+              onClick={() => removeDrawings([...selected], `Delete ${selected.size} selected drawing(s)? This cannot be undone.`)}
+              className="rounded border border-border px-3 py-1 disabled:opacity-40 hover:border-destructive hover:text-destructive"
+            >
+              Delete selected
+            </button>
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={deleteEverything}
+              className="rounded border border-border px-3 py-1 disabled:opacity-40 hover:border-destructive hover:text-destructive"
+            >
+              Delete all drawings in this project
+            </button>
+          </div>
+        ) : null}
+
         {drawings.data?.map((d) => (
-          <Link
+          <div
             key={d.id}
-            to="/drawings/$drawingId"
-            params={{ drawingId: d.id }}
-            className="flex items-center justify-between rounded-lg border border-border bg-card p-4 hover:border-primary"
+            className="flex items-center gap-4 rounded-lg border border-border bg-card p-4"
           >
-            <div>
-              <div className="font-display">{d.drawing_number ?? d.file_name}</div>
-              <div className="text-sm text-muted-foreground">
-                {[d.title, d.revision ? `Rev ${d.revision}` : null, d.triage_class?.replace(/_/g, " ")]
-                  .filter(Boolean)
-                  .join(" · ")}
+            <input
+              type="checkbox"
+              aria-label={`Select ${d.drawing_number ?? d.file_name}`}
+              checked={selected.has(d.id)}
+              onChange={(e) => {
+                setSelected((prev) => {
+                  const next = new Set(prev);
+                  if (e.target.checked) next.add(d.id);
+                  else next.delete(d.id);
+                  return next;
+                });
+              }}
+            />
+            <Link
+              to="/drawings/$drawingId"
+              params={{ drawingId: d.id }}
+              className="flex flex-1 items-center justify-between gap-4 hover:text-primary"
+            >
+              <div>
+                <div className="font-display">{d.drawing_number ?? d.file_name}</div>
+                <div className="text-sm text-muted-foreground">
+                  {[d.title, d.revision ? `Rev ${d.revision}` : null, d.triage_class?.replace(/_/g, " ")]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+                {d.status === "failed" && d.error_message ? (
+                  <div className="text-sm text-destructive">{d.error_message}</div>
+                ) : null}
               </div>
-              {d.status === "failed" && d.error_message ? (
-                <div className="text-sm text-destructive">{d.error_message}</div>
-              ) : null}
-            </div>
-            <span className="text-sm text-muted-foreground">{statusLabel(d.status)}</span>
-          </Link>
+              <span className="text-sm text-muted-foreground">{statusLabel(d.status)}</span>
+            </Link>
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={() =>
+                removeDrawings(
+                  [d.id],
+                  `Delete ${d.drawing_number ?? d.file_name}${d.revision ? ` Rev ${d.revision}` : ""}? Its findings and stored file are removed for good.`,
+                )
+              }
+              className="rounded border border-border px-3 py-1 text-sm disabled:opacity-40 hover:border-destructive hover:text-destructive"
+            >
+              Delete
+            </button>
+          </div>
         ))}
       </section>
 
