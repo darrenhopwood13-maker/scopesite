@@ -27,13 +27,17 @@ function fingerprint(topicName: string, drawingIds: string[]): string {
 export async function loadTopics(db: Db): Promise<TopicDef[]> {
   const { data, error } = await db
     .from("corroboration_topics")
-    .select("name, keywords, severity");
+    .select("name, keywords, severity, require_any");
   if (error || !data || !data.length) return TOPIC_SEEDS;
-  return (data as Array<{ name: string; keywords: string[]; severity: string }>).map((t) => ({
+  return (
+    data as Array<{ name: string; keywords: string[]; severity: string; require_any?: string[] }>
+  ).map((t) => ({
     name: t.name,
     keywords: t.keywords ?? [],
+    requireAny: t.require_any ?? [],
     severity: (t.severity === "medium" || t.severity === "low" ? t.severity : "high") as TopicDef["severity"],
   }));
+
 }
 
 /** Every deferral and every interface finding in the project, in match shape. */

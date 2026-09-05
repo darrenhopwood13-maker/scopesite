@@ -12,12 +12,31 @@ export type TopicDef = {
   name: string;
   keywords: string[];
   severity: TopicSeverity;
+  /**
+   * When present, a text only matches the topic if it also contains one of
+   * these terms. Stops broad context words (facade, cladding, panel) from
+   * pulling in findings that are really about something else.
+   */
+  requireAny?: string[];
 };
+
+const FIRE_TERMS = [
+  "fire",
+  "compartment",
+  "cavity barrier",
+  "fire stopping",
+  "encasement",
+  "fire seal",
+  "siderise",
+  "promat",
+  "sfs",
+];
 
 export const TOPIC_SEEDS: TopicDef[] = [
   {
     name: "Façade / fire interface",
     keywords: [
+      "fire",
       "fire protection",
       "fire stopping",
       "cavity barrier",
@@ -30,7 +49,16 @@ export const TOPIC_SEEDS: TopicDef[] = [
       "fire seal",
       "siderise",
       "promat",
+      "precast",
+      "brick-faced",
+      "brick faced",
+      "techrete",
+      "rainscreen",
+      "panel",
+      "capping",
+      "cassette",
     ],
+    requireAny: FIRE_TERMS,
     severity: "high",
   },
   {
@@ -95,10 +123,40 @@ export const TOPIC_SEEDS: TopicDef[] = [
       "flashing",
       "dpc",
       "cavity tray",
+      "membrane",
+      "bauder",
+      "single ply",
+      "single-ply",
+      "falls",
+      "tapered insulation",
+      "roof outlet",
+      "rainwater outlet",
+      "vapour barrier",
+      "vcl",
+      "avcl",
+      "sarking",
+      "gutter support",
+      "weathering",
+      "sealant compatibility",
+    ],
+    severity: "high",
+  },
+  {
+    name: "Site verification and existing conditions",
+    keywords: [
+      "to be confirmed on site",
+      "to confirm on site",
+      "adapted to suit site conditions",
+      "as built",
+      "as-built survey",
+      "indicative only",
+      "assumed position",
+      "verify on site",
     ],
     severity: "high",
   },
 ];
+
 
 // Accent- and case-insensitive. "façade" and "facade" are the same word, and a
 // keyword only ever matches on whole words, never inside a longer unrelated one.
@@ -120,7 +178,11 @@ export function matchedKeywords(text: string, keywords: string[]): string[] {
 }
 
 export function matchesTopic(text: string, topic: TopicDef): boolean {
-  return matchedKeywords(text, topic.keywords).length > 0;
+  if (matchedKeywords(text, topic.keywords).length === 0) return false;
+  if (topic.requireAny && topic.requireAny.length > 0) {
+    return matchedKeywords(text, topic.requireAny).length > 0;
+  }
+  return true;
 }
 
 export type TopicItem = {

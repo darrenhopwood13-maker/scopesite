@@ -63,6 +63,27 @@ export type Database = {
           },
         ]
       }
+      corroboration_topics: {
+        Row: {
+          id: string
+          keywords: string[]
+          name: string
+          severity: string
+        }
+        Insert: {
+          id?: string
+          keywords: string[]
+          name: string
+          severity?: string
+        }
+        Update: {
+          id?: string
+          keywords?: string[]
+          name?: string
+          severity?: string
+        }
+        Relationships: []
+      }
       corroborations: {
         Row: {
           created_at: string
