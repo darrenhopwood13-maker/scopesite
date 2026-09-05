@@ -235,6 +235,12 @@ export function buildReport(template: ReportTemplate, input: BuildInput): Report
     };
   }
 
+  if (template === "package_scope_gap") {
+    return buildPackageReport(base, input, byId);
+  }
+
+
+
   const parties = input.parties ?? [];
   const deferrals = input.items.filter((i) => i.item_type === "deferral");
   const rows = parties
