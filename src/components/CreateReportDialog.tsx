@@ -22,8 +22,8 @@ const db = supabase as unknown as SupabaseClient<any, "public", any>;
 
 type Props = {
   projectId: string;
-  drawingId?: string;
-  drawingLabel?: string;
+  drawingId?: string | undefined;
+  drawingLabel?: string | undefined;
 };
 
 export function CreateReportDialog({ projectId, drawingId, drawingLabel }: Props) {
