@@ -178,7 +178,11 @@ export function matchedKeywords(text: string, keywords: string[]): string[] {
 }
 
 export function matchesTopic(text: string, topic: TopicDef): boolean {
-  return matchedKeywords(text, topic.keywords).length > 0;
+  if (matchedKeywords(text, topic.keywords).length === 0) return false;
+  if (topic.requireAny && topic.requireAny.length > 0) {
+    return matchedKeywords(text, topic.requireAny).length > 0;
+  }
+  return true;
 }
 
 export type TopicItem = {
