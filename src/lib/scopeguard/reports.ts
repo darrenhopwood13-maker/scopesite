@@ -225,9 +225,10 @@ export function buildReport(template: ReportTemplate, input: BuildInput): Report
     .sort((a, b) => b.count - a.count || (a.row[0] ?? "").localeCompare(b.row[0] ?? ""))
     .map((r) => r.row);
 
+  // Deferrals naming nobody are the headline number, and they lead the table.
   const unnamed = deferrals.filter((i) => !i.party_id).length;
   if (unnamed > 0) {
-    rows.push([
+    rows.unshift([
       "No party named on the drawing",
       "Type not known",
       "Not known",
@@ -239,6 +240,10 @@ export function buildReport(template: ReportTemplate, input: BuildInput): Report
   return {
     ...base,
     title: `Party dependency report — ${input.scopeLabel}`,
+    headline:
+      unnamed > 0
+        ? `${unnamed} deferral${unnamed === 1 ? "" : "s"} across these drawings name no responsible party. Under our own rules those are all high severity.`
+        : "Every deferral across these drawings names a responsible party.",
     columns: ["Party", "Type", "Appointment status", "Deferrals", "Drawings depending on them"],
     rows,
     emptyMessage: "No parties have been recorded for this scope yet.",
