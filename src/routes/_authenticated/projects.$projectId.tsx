@@ -208,11 +208,14 @@ function ProjectPage() {
         </Link>
       </AccountBar>
 
-      <header className="space-y-1">
-        <h1 className="font-display text-3xl">{project.data?.name ?? "Project"}</h1>
-        <p className="text-sm text-muted-foreground">
-          {[project.data?.client, project.data?.project_reference].filter(Boolean).join(" · ")}
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="font-display text-3xl">{project.data?.name ?? "Project"}</h1>
+          <p className="text-sm text-muted-foreground">
+            {[project.data?.client, project.data?.project_reference].filter(Boolean).join(" · ")}
+          </p>
+        </div>
+        <CreateReportDialog projectId={projectId} />
       </header>
 
       <section
