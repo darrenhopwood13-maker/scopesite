@@ -45,7 +45,7 @@ export async function loadTopicItems(db: Db, projectId: string): Promise<TopicIt
   const { data } = await db
     .from("drawing_items")
     .select(
-      "id, drawing_id, raw_text, item_type, interface_rule_id, drawings!inner(drawing_number, revision, originator)",
+      "id, drawing_id, raw_text, item_type, interface_rule_id, party_id, drawings!inner(drawing_number, revision, originator)",
     )
     .eq("project_id", projectId);
 
@@ -55,6 +55,7 @@ export async function loadTopicItems(db: Db, projectId: string): Promise<TopicIt
     raw_text: string;
     item_type: string;
     interface_rule_id: string | null;
+    party_id: string | null;
     drawings: { drawing_number: string | null; revision: string | null; originator: string | null } | null;
   };
 
@@ -68,6 +69,7 @@ export async function loadTopicItems(db: Db, projectId: string): Promise<TopicIt
       originator: r.drawings?.originator ?? null,
       raw_text: r.raw_text,
       is_deferral: r.item_type === "deferral",
+      party_id: r.party_id,
     }));
 }
 
