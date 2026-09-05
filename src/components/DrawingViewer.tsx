@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+// The browser worker, resolved by the bundler. The reader's server-side worker
+// in extract.server.ts is configured separately and never shared with this.
+import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { signedDrawingUrl } from "@/lib/scopeguard/viewer.functions";
 import {
   MAX_ZOOM,
@@ -84,11 +87,8 @@ export function DrawingViewer({
       try {
         // The browser build of pdf.js, with its own worker. The reader's
         // server-side worker is configured separately and never shared.
-        const pdfjs = await import("pdfjs-dist/build/pdf.mjs");
-        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-          "pdfjs-dist/build/pdf.worker.min.mjs",
-          import.meta.url,
-        ).toString();
+        const pdfjs = await import("pdfjs-dist");
+        pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
         const { url } = await getUrl({ data: { drawingId } });
         const doc = await pdfjs.getDocument({ url }).promise;
