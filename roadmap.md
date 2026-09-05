@@ -19,5 +19,15 @@
 - [x] Reading fixes: numbered-note splitting, one finding per note with other matched types listed, severity caps for generic pointers, wrapped-word repair, titleblock/triage written before findings, blank commercial risk replaced
 - [~] Acceptance check — run against the reading step directly on both PDFs (Veretec annotation_rich + red abeyance high; Foster notes_only + 12 deferrals incl. fire specialist; both titleblocks incl. type and discipline). NOT yet run end to end through the app screens (upload → database → register), because there is no way to sign in to the user's Supabase project from here. User is running both drawings through the app.
 
+## Scope Gap Bible seeding
+- [x] Step 1 — ten new trades (CIVL, PAVE, TIMB, WPRF, REND, ACFL, TILE, PLAS, LTNG, TMPW)
+- [x] Step 2 — 15 new interface rules; 8 existing rules merged (guidance + trade union only, no trigger terms removed)
+- [x] Step 3 — 11 new deferral patterns incl. exclusions and warranty/guarantee responsibility
+- [x] Step 4 — severity model: life-safety escalation, programme sensitivity, tidy-up de-escalation (`applySeverityModel`)
+- [ ] Step 5 — trade cues per trade, drawing language only
+- [ ] Step 6 — nine-category findings taxonomy, five marked not yet detected
+- [ ] Step 7 — gap register fields incl. `resolved_pending_reissue`
+
 ## Later phases (not started)
-- Phase 2 allocation, Phase 3 corroboration/coverage, Phase 4 AI residual, Phase 5 polish
+- Phase 4 AI residual, Phase 5 polish
+
