@@ -89,7 +89,7 @@ export async function refreshPartyRegister(
         .from("parties")
         .insert({
           ...stamp,
-          canonical_name: raw,
+          canonical_name: titleCaseName(raw),
           normalised_name: key,
           party_type: inferPartyType(raw),
           appointed_status: "unknown",
