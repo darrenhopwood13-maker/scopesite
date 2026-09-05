@@ -4,7 +4,12 @@
 export const DISCLAIMER =
   "Advisory only. ScopeGuard reports what the drawings say; it is not a compliance check or an approval. Scope allocation must be verified against the executed sub-contract documents by the Commercial Manager or Design Manager before it is relied upon.";
 
-export type ReportTemplate = "deferrals_register" | "open_items_schedule" | "party_dependency";
+export type ReportTemplate =
+  | "deferrals_register"
+  | "open_items_schedule"
+  | "party_dependency"
+  | "package_scope_gap";
+
 
 export const TEMPLATES: Array<{ id: ReportTemplate; name: string; description: string }> = [
   {
