@@ -123,10 +123,14 @@ export async function refreshPartyRegister(
     await db.from("drawing_items").update({ party_id: partyId }).eq("id", item.id);
   }
 
-  await rebuildPartyCorroborations(db, stamp);
+  await rebuildPartyCorroborationsImpl(db, stamp);
 }
 
-async function rebuildPartyCorroborations(db: Db, stamp: Stamp): Promise<void> {
+export async function rebuildPartyCorroborations(client: unknown, stampArg: Stamp): Promise<void> {
+  return rebuildPartyCorroborationsImpl(client as Db, stampArg);
+}
+
+async function rebuildPartyCorroborationsImpl(db: Db, stamp: Stamp): Promise<void> {
   const { data: rows } = await db
     .from("drawing_items")
     .select("id, party_id, drawing_id, raw_text, drawings!inner(originator, drawing_number, revision)")
