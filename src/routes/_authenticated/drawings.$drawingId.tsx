@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,6 +8,8 @@ import { AccountBar } from "@/components/AccountBar";
 import { Disclaimer } from "@/components/Disclaimer";
 import { CreateReportDialog } from "@/components/CreateReportDialog";
 import { DRAWING_STATUS, ITEM_TYPE } from "@/lib/scopeguard/vocab";
+import { DrawingViewer } from "@/components/DrawingViewer";
+import { isLocatable } from "@/lib/scopeguard/viewer-transform";
 
 export const Route = createFileRoute("/_authenticated/drawings/$drawingId")({
   head: () => ({
@@ -54,7 +56,15 @@ type Item = {
   corrected_trade_code: string | null;
   correction_status: string | null;
   correction_note: string | null;
+  bbox: unknown;
+  bbox_frame: string | null;
+  font_size: number | null;
 };
+
+/** A finding can only be shown on the sheet if a usable position was recorded. */
+function locatable(item: Item): boolean {
+  return isLocatable(item.bbox, item.bbox_frame);
+}
 
 // Columns added after the generated database types were last refreshed.
 function alsoMatches(item: unknown): string[] {
@@ -100,6 +110,42 @@ const TAB_LABELS: Record<Tab, string> = {
 function DrawingPage() {
   const { drawingId } = Route.useParams();
   const [tab, setTab] = useState<Tab>("deferrals");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const [pane, setPane] = useState<"findings" | "drawing">("findings");
+  const [split, setSplit] = useState<number>(40);
+  const [narrow, setNarrow] = useState(false);
+
+  useEffect(() => {
+    const stored = Number(window.localStorage.getItem("scopeguard.viewerSplit"));
+    if (stored >= 20 && stored <= 70) setSplit(stored);
+    const mql = window.matchMedia("(max-width: 1023px)");
+    const onChange = () => setNarrow(mql.matches);
+    onChange();
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+
+  const splitRef = useRef<HTMLDivElement | null>(null);
+  const startDrag = () => {
+    const onMove = (e: MouseEvent) => {
+      const box = splitRef.current?.getBoundingClientRect();
+      if (!box) return;
+      const pct = Math.min(70, Math.max(20, ((e.clientX - box.left) / box.width) * 100));
+      setSplit(pct);
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      setSplit((v) => {
+        window.localStorage.setItem("scopeguard.viewerSplit", String(Math.round(v)));
+        return v;
+      });
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  };
 
   const drawing = useQuery({
     queryKey: ["drawing", drawingId],
@@ -156,6 +202,22 @@ function DrawingPage() {
   };
 
   const all = items.data ?? [];
+
+  // A rising count of findings with no recorded position means extraction has
+  // regressed, so it is reported rather than quietly hidden.
+  useEffect(() => {
+    if (!all.length) return;
+    const missing = all.filter((i) => !locatable(i)).length;
+    if (missing) {
+      console.warn(`ScopeGuard viewer: ${missing} of ${all.length} findings have no usable position on this sheet.`);
+    }
+  }, [all]);
+
+  const selectOnSheet = (id: string) => {
+    setSelectedId(id);
+    setPane("drawing");
+    document.getElementById(`finding-${id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  };
   const deferrals = useMemo(() => all.filter((i) => i.item_type === ITEM_TYPE.deferral), [all]);
   const contested = useMemo(() => all.filter((i) => effectiveStatus(i) === "ambiguous"), [all]);
   const clear = useMemo(() => all.filter((i) => effectiveStatus(i) === "allocated"), [all]);
