@@ -14,38 +14,133 @@ export type Database = {
   }
   public: {
     Tables: {
+      corroboration_items: {
+        Row: {
+          corroboration_id: string
+          created_at: string
+          id: string
+          item_id: string
+          owner_id: string
+          project_id: string
+        }
+        Insert: {
+          corroboration_id: string
+          created_at?: string
+          id?: string
+          item_id: string
+          owner_id: string
+          project_id: string
+        }
+        Update: {
+          corroboration_id?: string
+          created_at?: string
+          id?: string
+          item_id?: string
+          owner_id?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "corroboration_items_corroboration_id_fkey"
+            columns: ["corroboration_id"]
+            isOneToOne: false
+            referencedRelation: "corroborations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "corroboration_items_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "drawing_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "corroboration_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       corroborations: {
         Row: {
           created_at: string
+          drawing_count: number
+          drawing_ids: string[]
+          fingerprint: string | null
+          first_seen_at: string
+          group_type: string
           id: string
           item_ids: string[]
+          kind: string
+          last_seen_at: string
+          narrative: string | null
+          originator_count: number
+          originators: string[]
           owner_id: string
+          party_id: string | null
           project_id: string
+          resolved_note: string | null
           severity: string | null
+          status: string
           summary: string | null
           topic: string
         }
         Insert: {
           created_at?: string
+          drawing_count?: number
+          drawing_ids?: string[]
+          fingerprint?: string | null
+          first_seen_at?: string
+          group_type?: string
           id?: string
           item_ids?: string[]
+          kind?: string
+          last_seen_at?: string
+          narrative?: string | null
+          originator_count?: number
+          originators?: string[]
           owner_id: string
+          party_id?: string | null
           project_id: string
+          resolved_note?: string | null
           severity?: string | null
+          status?: string
           summary?: string | null
           topic: string
         }
         Update: {
           created_at?: string
+          drawing_count?: number
+          drawing_ids?: string[]
+          fingerprint?: string | null
+          first_seen_at?: string
+          group_type?: string
           id?: string
           item_ids?: string[]
+          kind?: string
+          last_seen_at?: string
+          narrative?: string | null
+          originator_count?: number
+          originators?: string[]
           owner_id?: string
+          party_id?: string | null
           project_id?: string
+          resolved_note?: string | null
           severity?: string | null
+          status?: string
           summary?: string | null
           topic?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "corroborations_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "corroborations_project_id_fkey"
             columns: ["project_id"]
@@ -186,6 +281,7 @@ export type Database = {
           method: string | null
           owner_id: string
           page_number: number
+          party_id: string | null
           project_id: string
           raw_text: string
           recommended_action: string | null
@@ -223,6 +319,7 @@ export type Database = {
           method?: string | null
           owner_id: string
           page_number?: number
+          party_id?: string | null
           project_id: string
           raw_text: string
           recommended_action?: string | null
@@ -260,6 +357,7 @@ export type Database = {
           method?: string | null
           owner_id?: string
           page_number?: number
+          party_id?: string | null
           project_id?: string
           raw_text?: string
           recommended_action?: string | null
@@ -287,6 +385,13 @@ export type Database = {
             columns: ["interface_rule_id"]
             isOneToOne: false
             referencedRelation: "interface_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drawing_items_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
             referencedColumns: ["id"]
           },
           {
@@ -469,6 +574,114 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "trades"
             referencedColumns: ["code"]
+          },
+        ]
+      }
+      parties: {
+        Row: {
+          appointed_note: string | null
+          appointed_status: string
+          canonical_name: string
+          created_at: string
+          id: string
+          merged_into_party_id: string | null
+          needs_review: boolean
+          normalised_name: string
+          owner_id: string
+          party_type: string
+          project_id: string
+          review_reason: string | null
+        }
+        Insert: {
+          appointed_note?: string | null
+          appointed_status?: string
+          canonical_name: string
+          created_at?: string
+          id?: string
+          merged_into_party_id?: string | null
+          needs_review?: boolean
+          normalised_name: string
+          owner_id: string
+          party_type?: string
+          project_id: string
+          review_reason?: string | null
+        }
+        Update: {
+          appointed_note?: string | null
+          appointed_status?: string
+          canonical_name?: string
+          created_at?: string
+          id?: string
+          merged_into_party_id?: string | null
+          needs_review?: boolean
+          normalised_name?: string
+          owner_id?: string
+          party_type?: string
+          project_id?: string
+          review_reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parties_merged_into_party_id_fkey"
+            columns: ["merged_into_party_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "parties_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      party_aliases: {
+        Row: {
+          alias: string
+          created_at: string
+          id: string
+          normalised_alias: string
+          owner_id: string
+          party_id: string
+          project_id: string
+          source: string | null
+        }
+        Insert: {
+          alias: string
+          created_at?: string
+          id?: string
+          normalised_alias: string
+          owner_id: string
+          party_id: string
+          project_id: string
+          source?: string | null
+        }
+        Update: {
+          alias?: string
+          created_at?: string
+          id?: string
+          normalised_alias?: string
+          owner_id?: string
+          party_id?: string
+          project_id?: string
+          source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "party_aliases_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "parties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "party_aliases_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
           },
         ]
       }
