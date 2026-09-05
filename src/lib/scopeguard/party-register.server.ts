@@ -33,8 +33,10 @@ export async function refreshPartyRegister(
   client: unknown,
   drawingId: string,
   stamp: Stamp,
+  disclaimers: Array<{ party: string | null; text: string }> = [],
 ): Promise<void> {
   const db = client as Db;
+
 
   // 1. Every party named in a deferral on this drawing.
   const { data: items } = await db
