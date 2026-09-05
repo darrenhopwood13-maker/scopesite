@@ -6,6 +6,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { analyseDrawing } from "@/lib/scopeguard/analyse.functions";
 import { AccountBar } from "@/components/AccountBar";
 import { Disclaimer } from "@/components/Disclaimer";
+import { CreateReportDialog } from "@/components/CreateReportDialog";
 import { DRAWING_STATUS, ITEM_TYPE } from "@/lib/scopeguard/vocab";
 
 export const Route = createFileRoute("/_authenticated/drawings/$drawingId")({
@@ -198,35 +199,6 @@ function DrawingPage() {
     await prefixes.refetch();
   };
 
-  const exportXlsx = async () => {
-    const XLSX = await import("xlsx");
-    const rows = deferrals.map((i) => ({
-      Severity: i.severity ?? "",
-      Category: i.deferral_category ?? "",
-      Finding: i.raw_text,
-      Source: i.region ?? "",
-      "Deferred to": i.deferred_to ?? "Not named",
-      "Also matches": alsoMatches(i).join(", "),
-      Trade: effectiveTrade(i) ?? "",
-      Allocation: statusLabel(i),
-      Action: i.recommended_action ?? "",
-      "Red text": i.is_red ? "Yes" : "No",
-    }));
-    const sheet = XLSX.utils.json_to_sheet(rows);
-    XLSX.utils.sheet_add_aoa(
-      sheet,
-      [
-        [
-          "Advisory only. ScopeGuard reports what the drawing says; it is not a compliance check or an approval. Verify against the executed sub-contract documents.",
-        ],
-      ],
-      { origin: -1 },
-    );
-    const book = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(book, sheet, "Deferrals");
-    XLSX.writeFile(book, `${drawing.data?.drawing_number ?? "drawing"}-deferrals.xlsx`);
-  };
-
   const d = drawing.data;
 
   return (
@@ -290,13 +262,13 @@ function DrawingPage() {
           >
             {reading ? "Reading…" : "Read again"}
           </button>
-          <button
-            onClick={exportXlsx}
-            disabled={!deferrals.length}
-            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground disabled:opacity-50"
-          >
-            Export to Excel
-          </button>
+          {d ? (
+            <CreateReportDialog
+              projectId={d.project_id}
+              drawingId={d.id}
+              drawingLabel={d.drawing_number ?? d.file_name ?? "this drawing"}
+            />
+          ) : null}
         </div>
       </div>
 
