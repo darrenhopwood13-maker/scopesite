@@ -6,8 +6,12 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   groupByTopic,
+  groupUnnamedParty,
   topicNarrative,
   topicSummary,
+  unnamedPartyNarrative,
+  unnamedPartySummary,
+  unnamedPartyTitle,
   TOPIC_SEEDS,
   type TopicDef,
   type TopicItem,
