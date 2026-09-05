@@ -262,4 +262,9 @@ async function rebuildPartyCorroborationsImpl(db: Db, stamp: Stamp): Promise<voi
   for (const [, c] of stale) {
     await db.from("corroborations").delete().eq("id", c.id);
   }
+
+  // The topic axis is derived from the same findings and is rebuilt in the
+  // same pass, so a read or a deletion re-derives both axes together.
+  const { rebuildTopicCorroborations } = await import("./topic-corroboration.server");
+  await rebuildTopicCorroborations(db, stamp);
 }
