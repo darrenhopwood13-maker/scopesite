@@ -5,7 +5,32 @@ export type PartyRecord = {
   id: string;
   canonical_name: string;
   normalised_name: string;
+  party_type?: string;
 };
+
+// Unqualified terms defer to nobody: "BY SPECIALIST", "specialist subcontractor",
+// "others". They must not create a party — the deferral stays party-less, which
+// under the standing rule raises its severity to high. Only qualified forms
+// ("cladding specialist", "fire specialist") become parties.
+const GENERIC_PARTY_TERMS = new Set(["specialist", "specialist subcontractor", "others"]);
+
+export function isGenericPartyTerm(raw: string): boolean {
+  return GENERIC_PARTY_TERMS.has(normalisePartyName(raw));
+}
+
+// Wording-based type inference. A bare company name attached to a product is a
+// supplier (Techrete, AMR); where the wording is unclear, leave it unknown.
+export function inferPartyType(raw: string): string {
+  const k = normalisePartyName(raw);
+  if (!k) return "unknown";
+  if (/\b(tenant|landlord|client|employer)\b/.test(k)) return "client_side";
+  if (/\b(engineer|architect|surveyor|survey|designer|consultant|fire|acoustic)\b/.test(k))
+    return "consultant";
+  if (/\b(specialist|subcontractor|installer|contractor)\b/.test(k))
+    return "specialist_subcontractor";
+  if (k.split(" ").length <= 2) return "supplier";
+  return "unknown";
+}
 
 const QUALIFIERS =
   /\b(?:the|a|an|appointed|nominated|agreed|relevant|proposed|main|principal|approved)\b/g;
@@ -121,9 +146,50 @@ export function groupByParty(rows: PartyGroupInput[]): PartyGroup[] {
 
 export function corroborationSeverity(
   group: PartyGroup,
-  appointedStatus: string,
-): "high" | "medium" {
+  appointed: string,
+): "high" | "medium" | "low" {
   if (group.originators.length >= 2) return "high";
-  if (appointedStatus !== "appointed") return "high";
-  return "medium";
+  if (appointed !== "yes") return "high";
+  if (group.drawing_ids.length >= 2) return "medium";
+  return "low";
+}
+
+export type PartyEvidence = {
+  drawing_number: string | null;
+  revision: string | null;
+  originator: string | null;
+  text: string;
+};
+
+// Templated narrative only — deterministic, and it cannot fabricate.
+export function partyNarrative(
+  canonicalName: string,
+  appointed: string,
+  drawingCount: number,
+  originators: string[],
+  evidence: PartyEvidence[],
+): string {
+  const m = originators.length;
+  const appointmentLine =
+    appointed === "yes"
+      ? "This party is appointed."
+      : appointed === "no"
+        ? "This party is not appointed."
+        : "Appointment status is not recorded.";
+  const lines = evidence.map((e) => {
+    const sheet = [e.drawing_number, e.revision ? `Rev ${e.revision}` : null]
+      .filter(Boolean)
+      .join(" ");
+    const by = e.originator ? ` (${e.originator})` : "";
+    return `  • ${sheet}${by} — “${e.text}”`;
+  });
+  return [
+    `${canonicalName} carries deferred scope on ${drawingCount} drawing${drawingCount === 1 ? "" : "s"} from ${m} originator${m === 1 ? "" : "s"}.`,
+    appointmentLine,
+    "",
+    "Deferred on:",
+    ...lines,
+    "",
+    "Confirm this party is appointed and that their scope covers every item above.",
+  ].join("\n");
 }
