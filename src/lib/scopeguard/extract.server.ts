@@ -159,11 +159,23 @@ export async function extractDrawing(data: Uint8Array): Promise<ExtractResult> {
 
   const merged = mergeVertical(hLines, startsNewBlock);
 
+  // Titleblock by content first (works wherever the block sits), then the
+  // border line, then the fixed band as a last resort — which is logged, since
+  // a silent fallback is how titleblock text ends up asking to be allocated.
+  const tbBox = findTitleblockBox(merged, pageWidth, pageHeight);
+  if (!border && !tbBox) {
+    console.warn(
+      "[scopeguard] no titleblock border or field labels found; falling back to the fixed right-hand band",
+    );
+  }
+
   const items: Array<{ item: MergedItem; region: Region }> = merged.map((item) => {
+    if (tbBox && inBox(tbBox, item.x, item.y)) return { item, region: "titleblock" as Region };
     let region: Region = item.x >= notesStripX ? "notes" : "body";
     if (region === "notes" && item.y > pageHeight * 0.72) region = "titleblock";
     return { item, region };
   });
+
 
   const bodyTextCount = items.filter(
     (i) => i.region === "body" && !isAnnotationOnly(i.item.str),
