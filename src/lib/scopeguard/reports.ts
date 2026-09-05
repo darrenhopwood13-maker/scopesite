@@ -30,7 +30,14 @@ export const TEMPLATES: Array<{ id: ReportTemplate; name: string; description: s
     description:
       "Every party, its type and appointment status, how many deferrals sit with it and which drawings depend on it.",
   },
+  {
+    id: "package_scope_gap",
+    name: "Package scope gap report",
+    description:
+      "One trade at a time, for the tender pack: contested boundaries first, then what is clearly allocated to the package, deferrals that may land in it, the parties it depends on and every sheet the report was built from.",
+  },
 ];
+
 
 export type ReportDrawing = {
   id: string;
