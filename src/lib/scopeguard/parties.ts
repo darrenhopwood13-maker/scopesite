@@ -18,6 +18,58 @@ export function isGenericPartyTerm(raw: string): boolean {
   return GENERIC_PARTY_TERMS.has(normalisePartyName(raw));
 }
 
+// A party is a name, never a sentence fragment. Wording such as
+// "EMPHASISE AMR WORKS ONLY USING ARCHITECT'S" is a truncated drawing note.
+const VERB_WORDS = new Set([
+  "is","are","be","being","been","was","were","shall","must","will","can","may",
+  "emphasise","emphasize","ensure","provide","provided","confirm","confirmed","review","reviewed",
+  "refer","referred","install","installed","supply","supplied","works","work","working","using","use",
+  "coordinate","coordinated","allow","allowed","note","noted","check","checked","read","see","agree",
+  "agreed","design","designed","carry","carried","fix","fixed","form","formed","take","taken","make",
+]);
+
+const TRAILING_FRAGMENT = /\b(?:and|or|with|using|to|of|for|by|from|the|a|an|in|on|at|as)$/i;
+
+export function isPartyNameLike(raw: string): boolean {
+  const s = raw.replace(/\s+/g, " ").trim();
+  if (!s) return false;
+  const words = s.split(" ");
+  if (words.length > 6) return false;
+  // Mid-sentence endings: possessives, trailing joining words, dangling punctuation.
+  if (/[’']s$/.test(s) || /[,;:/\-–]$/.test(s)) return false;
+  if (TRAILING_FRAGMENT.test(s)) return false;
+  if (words.some((w) => VERB_WORDS.has(w.toLowerCase().replace(/[^a-z]/g, "")))) return false;
+  return true;
+}
+
+const NAME_PARTICLES = new Set(["and", "of", "the", "for", "de", "van", "von"]);
+const NAME_SUFFIX_CASE: Record<string, string> = {
+  ltd: "Ltd",
+  limited: "Limited",
+  llp: "LLP",
+  plc: "Plc",
+  uk: "UK",
+};
+
+// Canonical names are title cased however the drawing shouts them, so the same
+// party in capitals on one sheet reads the same as lower case on another.
+// Short all-capital tokens (AMR, MB, SFS) are treated as initialisms and kept.
+export function titleCaseName(raw: string): string {
+  const words = raw.replace(/\s+/g, " ").trim().split(" ");
+  return words
+    .map((w, i) => {
+      const bare = w.replace(/[^A-Za-z]/g, "");
+      const lower = bare.toLowerCase();
+      if (NAME_SUFFIX_CASE[lower]) return w.replace(bare, NAME_SUFFIX_CASE[lower]!);
+      if (bare.length > 0 && bare.length <= 3 && bare === bare.toUpperCase()) return w;
+      if (i > 0 && NAME_PARTICLES.has(lower)) return lower;
+      return w
+        .toLowerCase()
+        .replace(/(^|[\s('"-])([a-z])/g, (_m, p, c: string) => `${p}${c.toUpperCase()}`);
+    })
+    .join(" ");
+}
+
 // Wording-based type inference. A bare company name attached to a product is a
 // supplier (Techrete, AMR); where the wording is unclear, leave it unknown.
 export function inferPartyType(raw: string): string {

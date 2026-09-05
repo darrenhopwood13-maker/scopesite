@@ -9,9 +9,11 @@ import {
   groupByParty,
   inferPartyType,
   isGenericPartyTerm,
+  isPartyNameLike,
   matchParty,
   normalisePartyName,
   partyNarrative,
+  titleCaseName,
   type PartyEvidence,
   type PartyGroupInput,
   type PartyRecord,
@@ -61,7 +63,9 @@ export async function refreshPartyRegister(
 
     // Generic "specialist" / "others" defers to nobody: no party is created,
     // and the deferral reverts to unnamed, which carries high severity.
-    if (isGenericPartyTerm(raw)) {
+    // Generic terms, and sentence fragments that are not a name at all, name
+    // nobody: the deferral reverts to unnamed and carries high severity.
+    if (isGenericPartyTerm(raw) || !isPartyNameLike(raw)) {
       await db
         .from("drawing_items")
         .update({ party_id: null, deferred_to: null, severity: "high" })
@@ -85,7 +89,7 @@ export async function refreshPartyRegister(
         .from("parties")
         .insert({
           ...stamp,
-          canonical_name: raw,
+          canonical_name: titleCaseName(raw),
           normalised_name: key,
           party_type: inferPartyType(raw),
           appointed_status: "unknown",

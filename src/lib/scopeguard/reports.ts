@@ -71,6 +71,7 @@ export type Report = {
   columns: string[];
   rows: string[][];
   emptyMessage: string;
+  headline?: string;
 };
 
 const SEVERITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
@@ -84,11 +85,14 @@ const PARTY_TYPE_LABEL: Record<string, string> = {
   unknown: "Type not known",
 };
 
-const APPOINTED_LABEL: Record<string, string> = {
-  yes: "Appointed",
-  no: "Not appointed",
-  unknown: "Not known",
-};
+// Appointment is only ever what the user set. Anything we do not recognise
+// reads as "Not known" — a report must never assert an appointment nobody
+// has confirmed.
+function appointedLabel(status: string | null | undefined): string {
+  if (status === "yes") return "Appointed";
+  if (status === "no") return "Not appointed";
+  return "Not known";
+}
 
 export function drawingLabel(d: ReportDrawing | undefined): string {
   if (!d) return "Unknown drawing";
@@ -212,7 +216,7 @@ export function buildReport(template: ReportTemplate, input: BuildInput): Report
         row: [
           p.canonical_name,
           PARTY_TYPE_LABEL[p.party_type] ?? p.party_type,
-          APPOINTED_LABEL[p.appointed_status] ?? p.appointed_status,
+          appointedLabel(p.appointed_status),
           String(theirs.length),
           drawingNames.length ? drawingNames.join("; ") : "No drawings in this scope",
         ],
@@ -221,9 +225,10 @@ export function buildReport(template: ReportTemplate, input: BuildInput): Report
     .sort((a, b) => b.count - a.count || (a.row[0] ?? "").localeCompare(b.row[0] ?? ""))
     .map((r) => r.row);
 
+  // Deferrals naming nobody are the headline number, and they lead the table.
   const unnamed = deferrals.filter((i) => !i.party_id).length;
   if (unnamed > 0) {
-    rows.push([
+    rows.unshift([
       "No party named on the drawing",
       "Type not known",
       "Not known",
@@ -235,6 +240,10 @@ export function buildReport(template: ReportTemplate, input: BuildInput): Report
   return {
     ...base,
     title: `Party dependency report — ${input.scopeLabel}`,
+    headline:
+      unnamed > 0
+        ? `${unnamed} deferral${unnamed === 1 ? "" : "s"} across these drawings name no responsible party. Under our own rules those are all high severity.`
+        : "Every deferral across these drawings names a responsible party.",
     columns: ["Party", "Type", "Appointment status", "Deferrals", "Drawings depending on them"],
     rows,
     emptyMessage: "No parties have been recorded for this scope yet.",
@@ -287,12 +296,14 @@ export function reportToHtml(report: Report): string {
     tr { page-break-inside: avoid; }
     .disclaimer { margin-top: 16px; border-left: 3px solid #b58a00; padding: 8px 10px; background: #fdf8e8; font-size: 10px; }
     .empty { margin-top: 10px; font-style: italic; }
+    .headline { font-size: 13px; font-weight: bold; margin: 10px 0 2px; }
   </style></head><body>
     <h1>${escapeHtml(report.title)}</h1>
     <p class="meta">Project: ${escapeHtml(report.projectName)}${
       report.projectClient ? ` — Client: ${escapeHtml(report.projectClient)}` : ""
     }</p>
     <p class="meta">Generated: ${escapeHtml(formatDate(report.generatedAt))}</p>
+    ${report.headline ? `<p class="headline">${escapeHtml(report.headline)}</p>` : ""}
     <h2>Drawings covered</h2>
     <ul>${coverage}</ul>
     ${body}
@@ -306,6 +317,10 @@ export function reportToText(report: Report): string {
   lines.push(`Project: ${report.projectName}${report.projectClient ? ` — Client: ${report.projectClient}` : ""}`);
   lines.push(`Generated: ${formatDate(report.generatedAt)}`);
   lines.push("");
+  if (report.headline) {
+    lines.push(report.headline);
+    lines.push("");
+  }
   lines.push("Drawings covered:");
   if (report.drawings.length) {
     for (const d of report.drawings) {
