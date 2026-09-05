@@ -15,6 +15,7 @@ import {
   type ReportItem,
   type ReportParty,
   type ReportTemplate,
+  type ReportSection,
 } from "@/lib/scopeguard/reports";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -52,6 +53,7 @@ export function CreateReportDialog({ projectId, drawingId, drawingLabel }: Props
 function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & { onClose: () => void }) {
   const [template, setTemplate] = useState<ReportTemplate>("deferrals_register");
   const [scope, setScope] = useState<"drawing" | "project">(drawingId ? "drawing" : "project");
+  const [tradeCode, setTradeCode] = useState<string>("");
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -69,7 +71,7 @@ function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & {
     queryFn: async () => {
       const { data, error } = await db
         .from("drawings")
-        .select("id, drawing_number, file_name, revision, title, originator")
+        .select("id, drawing_number, file_name, revision, title, originator, triage_class")
         .eq("project_id", projectId)
         .order("drawing_number");
       if (error) throw error;
@@ -103,6 +105,24 @@ function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & {
     },
   });
 
+  const trades = useQuery({
+    queryKey: ["report-trades"],
+    queryFn: async () => {
+      const { data, error } = await db.from("trades").select("code, name, sort_order").order("sort_order");
+      if (error) throw error;
+      return (data ?? []) as Array<{ code: string; name: string; sort_order: number }>;
+    },
+  });
+
+  const cues = useQuery({
+    queryKey: ["report-trade-cues"],
+    queryFn: async () => {
+      const { data, error } = await db.from("trade_cues").select("trade_code, cue");
+      if (error) throw error;
+      return (data ?? []) as Array<{ trade_code: string; cue: string }>;
+    },
+  });
+
   const loading = project.isLoading || drawings.isLoading || items.isLoading || parties.isLoading;
 
   const report: Report | null = useMemo(() => {
@@ -110,7 +130,12 @@ function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & {
     const inScope =
       scope === "drawing" && drawingId ? drawings.data.filter((d) => d.id === drawingId) : drawings.data;
     const ids = new Set(inScope.map((d) => d.id));
+    const tradeNames = Object.fromEntries((trades.data ?? []).map((t) => [t.code, t.name]));
+    const picked = (trades.data ?? []).find((t) => t.code === tradeCode) ?? null;
     return buildReport(template, {
+      trade: picked ? { code: picked.code, name: picked.name } : null,
+      tradeCues: cues.data ?? [],
+      tradeNames,
       projectName: project.data.name,
       projectClient: project.data.client,
       drawings: inScope,
@@ -121,7 +146,19 @@ function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & {
           ? drawingWithRevision(inScope[0]) || (drawingLabel ?? "this drawing")
           : project.data.name,
     });
-  }, [project.data, drawings.data, items.data, parties.data, scope, template, drawingId, drawingLabel]);
+  }, [
+    project.data,
+    drawings.data,
+    items.data,
+    parties.data,
+    trades.data,
+    cues.data,
+    tradeCode,
+    scope,
+    template,
+    drawingId,
+    drawingLabel,
+  ]);
 
   const downloadPdf = async () => {
     if (!report) return;
