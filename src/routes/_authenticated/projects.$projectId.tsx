@@ -73,55 +73,90 @@ function ProjectPage() {
     },
   });
 
+  // Each file is handled on its own: the signed-in user is re-read (and the
+  // session refreshed if it is close to expiring) immediately before every
+  // upload and insert, so a long read of file 1 cannot leave file 2 writing
+  // with a stale identity — which is what the row-level security error was.
+  const currentOwnerId = useCallback(async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    let session = sessionData.session;
+    const expiresAt = (session?.expires_at ?? 0) * 1000;
+    if (!session || expiresAt - Date.now() < 60_000) {
+      const { data: refreshed, error } = await supabase.auth.refreshSession();
+      if (error || !refreshed.session) throw new Error("Your sign-in has expired. Please sign in again.");
+      session = refreshed.session;
+    }
+    const owner = session.user?.id;
+    if (!owner) throw new Error("Not signed in");
+    return owner;
+  }, []);
+
   const upload = useCallback(
     async (files: FileList | null) => {
       if (!files?.length) return;
       setBusy(true);
       setMessage(null);
+      const problems: string[] = [];
+      const uploaded: string[] = [];
       try {
-        const { data: auth } = await supabase.auth.getUser();
-        const owner = auth.user?.id;
-        if (!owner) throw new Error("Not signed in");
-
         for (const file of Array.from(files)) {
           if (!file.name.toLowerCase().endsWith(".pdf")) {
-            setMessage(`${file.name} is not a PDF and was skipped.`);
+            problems.push(`${file.name} is not a PDF and was skipped.`);
             continue;
           }
-          const hash = await sha256(file);
-          const path = `${owner}/${projectId}/${hash}.pdf`;
+          try {
+            // Read fresh for every file — never carried over from the loop start.
+            const owner = await currentOwnerId();
+            const hash = await sha256(file);
+            const path = `${owner}/${projectId}/${hash}.pdf`;
 
-          const { error: uploadError } = await supabase.storage
-            .from("drawings")
-            .upload(path, file, { contentType: "application/pdf", upsert: true });
-          if (uploadError) throw uploadError;
+            const { error: uploadError } = await supabase.storage
+              .from("drawings")
+              .upload(path, file, { contentType: "application/pdf", upsert: true });
+            if (uploadError) throw uploadError;
 
-          const { data: row, error: insertError } = await supabase
-            .from("drawings")
-            .insert({
-              project_id: projectId,
-              owner_id: owner,
-              file_name: file.name,
-              storage_path: path,
-              file_hash: hash,
-              status: DRAWING_STATUS.queued,
-            })
-            .select("id")
-            .single();
-          if (insertError) throw insertError;
+            const { data: row, error: insertError } = await supabase
+              .from("drawings")
+              .insert({
+                project_id: projectId,
+                owner_id: owner,
+                file_name: file.name,
+                storage_path: path,
+                file_hash: hash,
+                status: DRAWING_STATUS.queued,
+              })
+              .select("id")
+              .single();
+            if (insertError) throw insertError;
+            uploaded.push(row.id);
+          } catch (error) {
+            // One bad file must not abandon the rest of the batch.
+            problems.push(`${file.name}: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }
 
-          await analyse({ data: { drawingId: row.id } });
+        qc.invalidateQueries({ queryKey: ["drawings", projectId] });
+
+        // Reading happens only after every file is safely stored, so a slow
+        // read can never delay (and expire) a later upload.
+        for (const drawingId of uploaded) {
+          try {
+            await currentOwnerId();
+            await analyse({ data: { drawingId } });
+          } catch (error) {
+            problems.push(error instanceof Error ? error.message : String(error));
+          }
           qc.invalidateQueries({ queryKey: ["drawings", projectId] });
         }
-      } catch (error) {
-        setMessage(error instanceof Error ? error.message : String(error));
       } finally {
         setBusy(false);
+        setMessage(problems.length ? problems.join(" ") : null);
         qc.invalidateQueries({ queryKey: ["drawings", projectId] });
       }
     },
-    [analyse, projectId, qc],
+    [analyse, currentOwnerId, projectId, qc],
   );
+
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10 space-y-8">
