@@ -296,6 +296,7 @@ export function reportToHtml(report: Report): string {
     tr { page-break-inside: avoid; }
     .disclaimer { margin-top: 16px; border-left: 3px solid #b58a00; padding: 8px 10px; background: #fdf8e8; font-size: 10px; }
     .empty { margin-top: 10px; font-style: italic; }
+    .headline { font-size: 13px; font-weight: bold; margin: 10px 0 2px; }
   </style></head><body>
     <h1>${escapeHtml(report.title)}</h1>
     <p class="meta">Project: ${escapeHtml(report.projectName)}${
