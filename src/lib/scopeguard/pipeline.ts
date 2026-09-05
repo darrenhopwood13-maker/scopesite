@@ -680,7 +680,84 @@ export function applySeverityModel(
   return base;
 }
 
+
+/* ------------------------------------------------------------------ */
+/* Red is emphasis unless the words say hold                            */
+/* ------------------------------------------------------------------ */
+
+// Only these words make a note a hold. "No mechanical fixings between" is
+// emphasis, not abeyance.
+export const HOLD_LANGUAGE = new RegExp(
+  [
+    "abeyance",
+    "on hold",
+    "\\bhold\\b",
+    "\\btbc\\b",
+    "to be confirmed",
+    "to be reviewed",
+    "under review",
+    "not for construction",
+    "\\bnfc\\b",
+    "pending (?:approval|review|instruction)",
+    "awaiting (?:approval|instruction|confirmation)",
+  ].join("|"),
+  "i",
+);
+
+// A red note that is not a hold still says something. Classify it by content
+// so it lands in the right place; the colour only lifts its severity.
+export function classifyRedByContent(text: string, partyNamed: boolean): string {
+  if (partyNamed) return "by_others";
+  if (/\b(?:performance|design(?:ed)? by|specialist design|to achieve|in accordance with)\b/i.test(text))
+    return "performance_req";
+  if (/\b(?:movement|tolerance|clearance|between|interface|junction|no\s+(?:mechanical\s+)?fixing|high point|falls?)\b/i.test(text))
+    return "scope_boundary";
+  if (/\b(?:as required|to suit|as necessary|refer to|to be (?:agreed|advised))\b/i.test(text))
+    return "design_deferral";
+  return "scope_boundary";
+}
+
+/* ------------------------------------------------------------------ */
+/* Party disclaimers — boilerplate on the sheet, a finding once            */
+/* ------------------------------------------------------------------ */
+
+// A subcontractor disclaiming responsibility for interfaces and coordination
+// is a real finding, but it is printed on every one of their sheets. It is
+// excluded from the per-sheet deferrals and surfaced once against the party.
+const DISCLAIMER_LANGUAGE = new RegExp(
+  [
+    "produced to emphasise",
+    "works only",
+    "no responsibility (?:is )?(?:accepted|taken)",
+    "accepts? no responsibility",
+    "not responsible for",
+    "excludes? (?:all )?(?:other )?(?:trades|works|interfaces)",
+    "for (?:information|indicative) purposes only",
+  ].join("|"),
+  "i",
+);
+
+export type PartyDisclaimer = { party: string | null; text: string };
+
+export function detectPartyDisclaimers(
+  items: Array<{ item: MergedItem; region: Region }>,
+  originator?: string | null,
+): PartyDisclaimer[] {
+  const out = new Map<string, PartyDisclaimer>();
+  for (const { item, region } of items) {
+    if (region === "titleblock") continue;
+    const text = item.str.replace(/\s+/g, " ").trim();
+    if (text.length < 20 || !DISCLAIMER_LANGUAGE.test(text)) continue;
+    // A disclaimer belongs to whoever wrote it: the sheet's own author.
+    const party = originator ?? namedParty(text) ?? extractDeferredTo(text);
+    const key = text.toLowerCase();
+    if (!out.has(key)) out.set(key, { party, text });
+  }
+  return [...out.values()];
+}
+
 export function detectDeferrals(
+
 
   items: Array<{ item: MergedItem; region: Region }>,
   patterns: DeferralPattern[],
@@ -806,13 +883,20 @@ export function detectDeferrals(
     }
   }
 
-  // Stage 4 — colour flag: red text no pattern caught is still a hold.
+  // Stage 4 — colour flag. Red is not a hold in itself: on one sheet it marks
+  // an item in abeyance, on another it is simply emphasis. Red always
+  // escalates severity; it only classifies as a hold where hold language is
+  // actually present. Otherwise the note is classified by what it says.
 
   for (const { item, region } of items) {
     if (region === "titleblock") continue;
     const text = item.str.trim();
     if (text.length < 8 || !isRedish(item.colour) || excluded(text)) continue;
     if (findings.some((f) => text.includes(f.raw_text) || f.raw_text.includes(text))) continue;
+    const named = isOriginatorParty(extractDeferredTo(text), originator)
+      ? null
+      : extractDeferredTo(text);
+    const onHold = HOLD_LANGUAGE.test(text);
     findings.push({
       raw_text: text,
       region,
@@ -820,16 +904,18 @@ export function detectDeferrals(
       colour: item.colour,
       font_size: item.fontSize,
       is_red: true,
-      deferral_category: "hold_status",
+      deferral_category: onHold ? "hold_status" : classifyRedByContent(text, named !== null),
       also_categories: [],
-      deferred_to: isOriginatorParty(extractDeferredTo(text), originator) ? null : extractDeferredTo(text),
+      deferred_to: named,
       severity: "high",
       commercial_risk: null,
-      recommended_action:
-        "Marked in red on the drawing. Confirm the item is resolved and re-issued before it is relied upon.",
+      recommended_action: onHold
+        ? "Marked in red and on hold. Confirm the item is resolved and re-issued before it is relied upon."
+        : "Highlighted in red on the drawing. Confirm who carries this requirement and that it is priced.",
       method: "colour",
     });
   }
+
 
   const order = { high: 0, medium: 1, low: 2 } as const;
   return findings.sort((a, b) => order[a.severity] - order[b.severity]);
