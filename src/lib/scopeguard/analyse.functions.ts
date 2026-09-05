@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { detectDeferrals, isAnnotationOnly, type DeferralPattern } from "./pipeline";
+import { contestedSeverity, detectDeferrals, isAnnotationOnly, type DeferralPattern } from "./pipeline";
 import { allocate, type CodePrefix, type InterfaceRule, type TradeCue } from "./allocate";
 
 import { DRAWING_STATUS, ITEM_TYPE } from "./vocab";
@@ -233,6 +233,7 @@ export const analyseDrawing = createServerFn({ method: "POST" })
             colour: item.colour,
             font_size: item.fontSize,
             is_red: false,
+            severity: contestedSeverity(t, a.interface_guidance, a.interface_severity),
             // Always explicit: a bulk insert sends every key present on any row,
             // so an omitted key here would be written as NULL, not defaulted.
             also_categories: [] as string[],

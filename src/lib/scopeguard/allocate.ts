@@ -27,6 +27,8 @@ export type Allocation = {
   unknown_prefix: string | null;
   interface_rule_id: string | null;
   interface_guidance: string | null;
+  /** Base severity of the matched interface rule, before life-safety escalation. */
+  interface_severity: string | null;
   allocation_method: "system_code" | "cue" | "interface_rule" | "none";
 };
 
@@ -154,6 +156,7 @@ export function allocate(
     unknown_prefix: null,
     interface_rule_id: null,
     interface_guidance: null,
+    interface_severity: null,
     allocation_method: "none",
   };
 
@@ -194,6 +197,7 @@ export function allocate(
       confidence: null,
       interface_rule_id: winners[0]!.rule.id,
       interface_guidance: guidance || null,
+      interface_severity: winners[0]!.rule.severity ?? null,
       allocation_method: "interface_rule",
     };
   }
