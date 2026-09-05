@@ -477,6 +477,10 @@ function DrawingPage() {
               }
               onCorrect={correct}
               onTeachPrefix={teachPrefix}
+              selected={selectedId === g.item.id}
+              canLocate={locatable(g.item)}
+              onLocate={() => selectFromList(g.item)}
+              onHover={(on) => setHoveredId(on ? g.item.id : null)}
             />
           ))}
 
@@ -549,6 +553,10 @@ function AllocationRow({
   unknownPrefix,
   onCorrect,
   onTeachPrefix,
+  selected,
+  canLocate,
+  onLocate,
+  onHover,
 }: {
   item: Item;
   ids: string[];
@@ -557,6 +565,10 @@ function AllocationRow({
   unknownPrefix: string | null;
   onCorrect: (ids: string[], patch: Record<string, unknown>) => Promise<void>;
   onTeachPrefix: (prefix: string, tradeCode: string) => Promise<void>;
+  selected: boolean;
+  canLocate: boolean;
+  onLocate: () => void;
+  onHover: (on: boolean) => void;
 }) {
   const [note, setNote] = useState("");
   const [showNote, setShowNote] = useState(false);
@@ -564,7 +576,14 @@ function AllocationRow({
     code ? (trades.find((t) => t.code === code)?.name ?? code) : null;
 
   return (
-    <article className="rounded-lg border border-border bg-card p-4 space-y-3">
+    <article
+      id={`finding-${item.id}`}
+      onMouseEnter={() => onHover(true)}
+      onMouseLeave={() => onHover(false)}
+      className={`rounded-lg border bg-card p-4 space-y-3 ${
+        selected ? "border-accent ring-1 ring-accent" : "border-border"
+      }`}
+    >
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <span className="font-medium uppercase">{statusLabel(item)}</span>
         {effectiveTrade(item) ? (
@@ -652,6 +671,13 @@ function AllocationRow({
         >
           Dismiss
         </button>
+        {canLocate ? (
+          <button onClick={onLocate} className="rounded-md border border-border px-3 py-1 font-medium">
+            Show on sheet
+          </button>
+        ) : (
+          <span className="text-muted-foreground">Location not available on sheet</span>
+        )}
       </div>
 
       {showNote ? (
