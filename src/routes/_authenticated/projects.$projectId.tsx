@@ -7,6 +7,7 @@ import { analyseDrawing } from "@/lib/scopeguard/analyse.functions";
 import { deleteDrawings } from "@/lib/scopeguard/delete.functions";
 import { AccountBar } from "@/components/AccountBar";
 import { Disclaimer } from "@/components/Disclaimer";
+import { CreateReportDialog } from "@/components/CreateReportDialog";
 import { PartyRegister } from "@/components/PartyRegister";
 import { DRAWING_STATUS, DRAWING_STATUS_LABELS, type DrawingStatus } from "@/lib/scopeguard/vocab";
 
@@ -208,11 +209,14 @@ function ProjectPage() {
         </Link>
       </AccountBar>
 
-      <header className="space-y-1">
-        <h1 className="font-display text-3xl">{project.data?.name ?? "Project"}</h1>
-        <p className="text-sm text-muted-foreground">
-          {[project.data?.client, project.data?.project_reference].filter(Boolean).join(" · ")}
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="font-display text-3xl">{project.data?.name ?? "Project"}</h1>
+          <p className="text-sm text-muted-foreground">
+            {[project.data?.client, project.data?.project_reference].filter(Boolean).join(" · ")}
+          </p>
+        </div>
+        <CreateReportDialog projectId={projectId} />
       </header>
 
       <section
