@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { analyseDrawing } from "@/lib/scopeguard/analyse.functions";
+import { deleteDrawings } from "@/lib/scopeguard/delete.functions";
 import { AccountBar } from "@/components/AccountBar";
 import { Disclaimer } from "@/components/Disclaimer";
 import { PartyRegister } from "@/components/PartyRegister";
