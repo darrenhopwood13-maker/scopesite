@@ -216,7 +216,7 @@ export function buildReport(template: ReportTemplate, input: BuildInput): Report
         row: [
           p.canonical_name,
           PARTY_TYPE_LABEL[p.party_type] ?? p.party_type,
-          APPOINTED_LABEL[p.appointed_status] ?? p.appointed_status,
+          appointedLabel(p.appointed_status),
           String(theirs.length),
           drawingNames.length ? drawingNames.join("; ") : "No drawings in this scope",
         ],
