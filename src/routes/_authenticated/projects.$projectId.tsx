@@ -7,6 +7,7 @@ import { analyseDrawing } from "@/lib/scopeguard/analyse.functions";
 import { deleteDrawings } from "@/lib/scopeguard/delete.functions";
 import { AccountBar } from "@/components/AccountBar";
 import { Disclaimer } from "@/components/Disclaimer";
+import { CreateReportDialog } from "@/components/CreateReportDialog";
 import { PartyRegister } from "@/components/PartyRegister";
 import { DRAWING_STATUS, DRAWING_STATUS_LABELS, type DrawingStatus } from "@/lib/scopeguard/vocab";
 
