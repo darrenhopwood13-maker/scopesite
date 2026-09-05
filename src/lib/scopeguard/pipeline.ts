@@ -742,9 +742,11 @@ export function detectDeferrals(
         // high when the note names nobody to carry them.
         const generic = p.category === "performance_req" || /\brefer to\b/i.test(text);
         if (generic && partyNamed && rank[severity] < rank["medium"]) severity = "medium";
-        if (!partyNamed) severity = "high";
-        if (isRed) severity = "high";
+        // The bible's severity model: life safety, no named party, programme
+        // sensitivity and tidy-up all applied in one place.
+        severity = applySeverityModel(severity, text, { partyNamed, isRed });
         if (!best || rank[severity] < rank[best.severity]) best = { p, severity };
+
       }
       if (!best) continue;
 
