@@ -16,6 +16,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthenticatedDrawingsDrawingIdRouteImport } from './routes/_authenticated/drawings.$drawingId'
 import { Route as AuthenticatedProjectsIndexRouteImport } from './routes/_authenticated/projects.index'
 import { Route as AuthenticatedProjectsProjectIdRouteImport } from './routes/_authenticated/projects.$projectId'
+import { Route as AuthenticatedProjectsProjectIdCorroborationsRouteImport } from './routes/_authenticated/projects.$projectId.corroborations'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -54,22 +55,30 @@ const AuthenticatedProjectsProjectIdRoute =
     path: '/projects/$projectId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedProjectsProjectIdCorroborationsRoute =
+  AuthenticatedProjectsProjectIdCorroborationsRouteImport.update({
+    id: '/corroborations',
+    path: '/corroborations',
+    getParentRoute: () => AuthenticatedProjectsProjectIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/drawings/$drawingId': typeof AuthenticatedDrawingsDrawingIdRoute
-  '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
+  '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRouteWithChildren
   '/projects/': typeof AuthenticatedProjectsIndexRoute
+  '/projects/$projectId/corroborations': typeof AuthenticatedProjectsProjectIdCorroborationsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/drawings/$drawingId': typeof AuthenticatedDrawingsDrawingIdRoute
-  '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
+  '/projects/$projectId': typeof AuthenticatedProjectsProjectIdRouteWithChildren
   '/projects': typeof AuthenticatedProjectsIndexRoute
+  '/projects/$projectId/corroborations': typeof AuthenticatedProjectsProjectIdCorroborationsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -78,8 +87,9 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/drawings/$drawingId': typeof AuthenticatedDrawingsDrawingIdRoute
-  '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRoute
+  '/_authenticated/projects/$projectId': typeof AuthenticatedProjectsProjectIdRouteWithChildren
   '/_authenticated/projects/': typeof AuthenticatedProjectsIndexRoute
+  '/_authenticated/projects/$projectId/corroborations': typeof AuthenticatedProjectsProjectIdCorroborationsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -90,6 +100,7 @@ export interface FileRouteTypes {
     | '/drawings/$drawingId'
     | '/projects/$projectId'
     | '/projects/'
+    | '/projects/$projectId/corroborations'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -98,6 +109,7 @@ export interface FileRouteTypes {
     | '/drawings/$drawingId'
     | '/projects/$projectId'
     | '/projects'
+    | '/projects/$projectId/corroborations'
   id:
     | '__root__'
     | '/'
@@ -107,6 +119,7 @@ export interface FileRouteTypes {
     | '/_authenticated/drawings/$drawingId'
     | '/_authenticated/projects/$projectId'
     | '/_authenticated/projects/'
+    | '/_authenticated/projects/$projectId/corroborations'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -167,18 +180,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjectsProjectIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/projects/$projectId/corroborations': {
+      id: '/_authenticated/projects/$projectId/corroborations'
+      path: '/corroborations'
+      fullPath: '/projects/$projectId/corroborations'
+      preLoaderRoute: typeof AuthenticatedProjectsProjectIdCorroborationsRouteImport
+      parentRoute: typeof AuthenticatedProjectsProjectIdRoute
+    }
   }
 }
 
+interface AuthenticatedProjectsProjectIdRouteChildren {
+  AuthenticatedProjectsProjectIdCorroborationsRoute: typeof AuthenticatedProjectsProjectIdCorroborationsRoute
+}
+
+const AuthenticatedProjectsProjectIdRouteChildren: AuthenticatedProjectsProjectIdRouteChildren =
+  {
+    AuthenticatedProjectsProjectIdCorroborationsRoute:
+      AuthenticatedProjectsProjectIdCorroborationsRoute,
+  }
+
+const AuthenticatedProjectsProjectIdRouteWithChildren =
+  AuthenticatedProjectsProjectIdRoute._addFileChildren(
+    AuthenticatedProjectsProjectIdRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDrawingsDrawingIdRoute: typeof AuthenticatedDrawingsDrawingIdRoute
-  AuthenticatedProjectsProjectIdRoute: typeof AuthenticatedProjectsProjectIdRoute
+  AuthenticatedProjectsProjectIdRoute: typeof AuthenticatedProjectsProjectIdRouteWithChildren
   AuthenticatedProjectsIndexRoute: typeof AuthenticatedProjectsIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDrawingsDrawingIdRoute: AuthenticatedDrawingsDrawingIdRoute,
-  AuthenticatedProjectsProjectIdRoute: AuthenticatedProjectsProjectIdRoute,
+  AuthenticatedProjectsProjectIdRoute:
+    AuthenticatedProjectsProjectIdRouteWithChildren,
   AuthenticatedProjectsIndexRoute: AuthenticatedProjectsIndexRoute,
 }
 

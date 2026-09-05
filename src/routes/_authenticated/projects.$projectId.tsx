@@ -216,7 +216,16 @@ function ProjectPage() {
             {[project.data?.client, project.data?.project_reference].filter(Boolean).join(" · ")}
           </p>
         </div>
-        <CreateReportDialog projectId={projectId} />
+        <div className="flex items-center gap-3">
+          <Link
+            to="/projects/$projectId/corroborations"
+            params={{ projectId }}
+            className="rounded border border-border px-3 py-2 text-sm hover:border-primary"
+          >
+            Corroborated gaps
+          </Link>
+          <CreateReportDialog projectId={projectId} />
+        </div>
       </header>
 
       <section
