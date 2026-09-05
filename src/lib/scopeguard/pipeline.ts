@@ -595,7 +595,93 @@ export type DetectOptions = {
   originator?: string | null;
 };
 
+/* ------------------------------------------------------------------ */
+/* Severity model — applied after pattern matching, on every path       */
+/* ------------------------------------------------------------------ */
+
+// The Scope Gap Bible grades anything touching fire compartmentation, means
+// of escape, structural fire protection or another statutory requirement as
+// high regardless of cost. That is a rule, not a judgement.
+const LIFE_SAFETY = new RegExp(
+  [
+    "\\bfire\\b",
+    "fire ?stopp?ing",
+    "compartment",
+    "means of escape",
+    "\\bescape\\b",
+    "\\brefuge\\b",
+    "cavity barrier",
+    "intumescent",
+    "\\bsmoke\\b",
+    "sprinkler",
+    "fire alarm",
+    "\\balarm\\b",
+    "life safety",
+    "accessib",
+    "part ?[bm]\\b",
+    "building reg",
+    "fire strategy",
+  ].join("|"),
+  "i",
+);
+
+// One level up: long-lead and structural items, where a late answer costs
+// programme as well as money.
+const PROGRAMME_SENSITIVE = new RegExp(
+  [
+    "long ?lead",
+    "lead ?time",
+    "\\bprocurement\\b",
+    "\\bbespoke\\b",
+    "curtain wall",
+    "\\bprecast\\b",
+    "\\bstructural\\b",
+    "structural steel",
+    "transfer beam",
+    "\\bcolumn\\b",
+    "\\bfoundation\\b",
+    "\\blift\\b",
+    "escalator",
+    "switchgear",
+    "generator",
+  ].join("|"),
+  "i",
+);
+
+// Documentation tidy-up only: changes neither price nor method.
+const TIDY_UP = new RegExp(
+  ["supersed", "superceded", "\\bduplicate\\b", "for information only", "drawing removed"].join("|"),
+  "i",
+);
+
+export type SeverityContext = { partyNamed: boolean; isRed: boolean; interfaceGuidance?: string | null };
+
+export function applySeverityModel(
+  base: Finding["severity"],
+  text: string,
+  context: SeverityContext,
+): Finding["severity"] {
+  const rank = { high: 0, medium: 1, low: 2 } as const;
+  const subject = `${text} ${context.interfaceGuidance ?? ""}`;
+
+  // Escalations to high come first and are absolute.
+  if (LIFE_SAFETY.test(subject)) return "high";
+  if (!context.partyNamed) return "high";
+  if (context.isRed) return "high";
+
+  // Documentation tidy-up drops to low, but only where nothing above applies.
+  if (TIDY_UP.test(subject)) return "low";
+
+  // Programme sensitivity moves it one level, never two.
+  if (PROGRAMME_SENSITIVE.test(subject)) {
+    return rank[base] > rank["high"] ? (base === "low" ? "medium" : "high") : base;
+  }
+
+  return base;
+}
+
 export function detectDeferrals(
+
   items: Array<{ item: MergedItem; region: Region }>,
   patterns: DeferralPattern[],
   options: DetectOptions = {},
