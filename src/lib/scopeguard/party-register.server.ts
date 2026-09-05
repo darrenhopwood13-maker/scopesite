@@ -1,13 +1,18 @@
 // Party register (Phase 3 step 1) and party corroborations (step 2).
 // Called at the end of a successful read, inside the same pass.
 
+import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   corroborationSeverity,
   displayName,
   groupByParty,
+  inferPartyType,
+  isGenericPartyTerm,
   matchParty,
   normalisePartyName,
+  partyNarrative,
+  type PartyEvidence,
   type PartyGroupInput,
   type PartyRecord,
 } from "./parties";
@@ -16,6 +21,11 @@ type Stamp = { project_id: string; owner_id: string };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any, "public", any>;
+
+function fingerprint(groupType: string, partyId: string, drawingIds: string[]): string {
+  const sorted = [...drawingIds].sort().join(",");
+  return createHash("sha256").update(`${groupType}|${partyId}|${sorted}`).digest("hex");
+}
 
 export async function refreshPartyRegister(
   client: unknown,
@@ -49,6 +59,16 @@ export async function refreshPartyRegister(
     const key = normalisePartyName(raw);
     if (!key) continue;
 
+    // Generic "specialist" / "others" defers to nobody: no party is created,
+    // and the deferral reverts to unnamed, which carries high severity.
+    if (isGenericPartyTerm(raw)) {
+      await db
+        .from("drawing_items")
+        .update({ party_id: null, deferred_to: null, severity: "high" })
+        .eq("id", item.id);
+      continue;
+    }
+
     const match = matchParty(raw, parties, aliases);
     let partyId: string | null = null;
 
@@ -67,6 +87,7 @@ export async function refreshPartyRegister(
           ...stamp,
           canonical_name: raw,
           normalised_name: key,
+          party_type: inferPartyType(raw),
           appointed_status: "unknown",
           ...review,
         })
@@ -108,17 +129,26 @@ export async function refreshPartyRegister(
 async function rebuildPartyCorroborations(db: Db, stamp: Stamp): Promise<void> {
   const { data: rows } = await db
     .from("drawing_items")
-    .select("id, party_id, drawing_id, drawings!inner(originator)")
+    .select("id, party_id, drawing_id, raw_text, drawings!inner(originator, drawing_number, revision)")
     .eq("project_id", stamp.project_id)
     .eq("item_type", "deferral")
     .not("party_id", "is", null);
 
-  const input: PartyGroupInput[] = ((rows ?? []) as Array<Record<string, unknown>>).map((r) => ({
-    item_id: r["id"] as string,
-    party_id: r["party_id"] as string,
-    drawing_id: r["drawing_id"] as string,
-    originator:
-      ((r["drawings"] as { originator: string | null } | null)?.originator ?? null) as string | null,
+  type Row = {
+    id: string;
+    party_id: string;
+    drawing_id: string;
+    raw_text: string;
+    drawings: { originator: string | null; drawing_number: string | null; revision: string | null } | null;
+  };
+
+  const typed = (rows ?? []) as unknown as Row[];
+
+  const input: PartyGroupInput[] = typed.map((r) => ({
+    item_id: r.id,
+    party_id: r.party_id,
+    drawing_id: r.drawing_id,
+    originator: r.drawings?.originator ?? null,
   }));
 
   const groups = groupByParty(input);
@@ -133,35 +163,95 @@ async function rebuildPartyCorroborations(db: Db, stamp: Stamp): Promise<void> {
     ),
   );
 
-  // Rebuilt from scratch each read so a removed finding never leaves a stale group.
-  await db.from("corroborations").delete().eq("project_id", stamp.project_id).eq("kind", "party");
+  // Fingerprinted records: a re-read updates last_seen_at rather than
+  // duplicating, and resolved / dismissed decisions survive a re-read.
+  const { data: existingRows } = await db
+    .from("corroborations")
+    .select("id, fingerprint, status")
+    .eq("project_id", stamp.project_id)
+    .eq("kind", "party");
+  const existing = new Map(
+    ((existingRows ?? []) as Array<{ id: string; fingerprint: string | null; status: string }>)
+      .filter((c) => c.fingerprint)
+      .map((c) => [c.fingerprint as string, c]),
+  );
+  const seen = new Set<string>();
 
   for (const g of groups) {
     const party = byId.get(g.party_id);
     if (!party) continue;
+
+    const fp = fingerprint("party", g.party_id, g.drawing_ids);
+    seen.add(fp);
+
     const severity = corroborationSeverity(g, party.appointed_status);
-    const { data: corr } = await db
-      .from("corroborations")
-      .insert({
-        ...stamp,
-        kind: "party",
-        party_id: g.party_id,
-        topic: party.canonical_name,
-        severity,
-        summary:
-          `${party.canonical_name} is named on ${g.drawing_ids.length} drawings` +
-          (g.originators.length >= 2 ? ` by ${g.originators.length} originators` : "") +
-          (party.appointed_status === "appointed" ? "." : ", and is not recorded as appointed."),
-        item_ids: g.item_ids,
-        drawing_ids: g.drawing_ids,
-        originators: g.originators,
-      })
-      .select("id")
-      .maybeSingle();
-    if (!corr) continue;
-    const corrId = (corr as { id: string }).id;
+    const evidence: PartyEvidence[] = typed
+      .filter((r) => r.party_id === g.party_id)
+      .map((r) => ({
+        drawing_number: r.drawings?.drawing_number ?? null,
+        revision: r.drawings?.revision ?? null,
+        originator: r.drawings?.originator ?? null,
+        text: r.raw_text,
+      }));
+    const narrative = partyNarrative(
+      party.canonical_name,
+      party.appointed_status,
+      g.drawing_ids.length,
+      g.originators,
+      evidence,
+    );
+
+    const payload = {
+      ...stamp,
+      kind: "party",
+      group_type: "party",
+      party_id: g.party_id,
+      topic: party.canonical_name,
+      severity,
+      narrative,
+      summary:
+        `${party.canonical_name} is named on ${g.drawing_ids.length} drawings` +
+        (g.originators.length >= 2 ? ` by ${g.originators.length} originators` : "") +
+        (party.appointed_status === "yes" ? "." : ", and is not recorded as appointed."),
+      item_ids: g.item_ids,
+      drawing_ids: g.drawing_ids,
+      originators: g.originators,
+      drawing_count: g.drawing_ids.length,
+      originator_count: g.originators.length,
+      fingerprint: fp,
+      last_seen_at: new Date().toISOString(),
+    };
+
+    const prior = existing.get(fp);
+    let corrId: string | null = null;
+    if (prior) {
+      // Status and resolved_note are the user's decisions — never overwritten.
+      const { data: updated } = await db
+        .from("corroborations")
+        .update(payload)
+        .eq("id", prior.id)
+        .select("id")
+        .maybeSingle();
+      corrId = (updated as { id: string } | null)?.id ?? prior.id;
+      await db.from("corroboration_items").delete().eq("corroboration_id", corrId);
+    } else {
+      const { data: corr } = await db
+        .from("corroborations")
+        .insert({ ...payload, status: "open" })
+        .select("id")
+        .maybeSingle();
+      corrId = (corr as { id: string } | null)?.id ?? null;
+    }
+    if (!corrId) continue;
     await db
       .from("corroboration_items")
       .insert(g.item_ids.map((itemId) => ({ ...stamp, corroboration_id: corrId, item_id: itemId })));
+  }
+
+  // Open records for groups that no longer exist are stale; remove them.
+  // Resolved and dismissed records are kept as the user's record.
+  const stale = [...existing.entries()].filter(([fp, c]) => !seen.has(fp) && c.status === "open");
+  for (const [, c] of stale) {
+    await db.from("corroborations").delete().eq("id", c.id);
   }
 }
