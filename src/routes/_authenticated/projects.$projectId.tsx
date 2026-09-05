@@ -73,10 +73,9 @@ function ProjectPage() {
     },
   });
 
-  // Each file is handled on its own: the signed-in user is re-read (and the
-  // session refreshed if it is close to expiring) immediately before every
-  // upload and insert, so a long read of file 1 cannot leave file 2 writing
-  // with a stale identity — which is what the row-level security error was.
+  // Both a single selection and a multi-file selection use this same per-file
+  // path. The storage name is content-addressed, so an existing object is the
+  // same PDF and can be reused instead of requiring Storage UPDATE permission.
   const currentOwnerId = useCallback(async () => {
     const { data: sessionData } = await supabase.auth.getSession();
     let session = sessionData.session;
@@ -112,8 +111,13 @@ function ProjectPage() {
 
             const { error: uploadError } = await supabase.storage
               .from("drawings")
-              .upload(path, file, { contentType: "application/pdf", upsert: true });
-            if (uploadError) throw uploadError;
+              .upload(path, file, { contentType: "application/pdf", upsert: false });
+            if (uploadError) {
+              const alreadyStored =
+                uploadError.message.toLowerCase().includes("already exists") ||
+                uploadError.message.toLowerCase().includes("duplicate");
+              if (!alreadyStored) throw uploadError;
+            }
 
             const { data: row, error: insertError } = await supabase
               .from("drawings")
