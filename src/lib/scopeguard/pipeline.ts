@@ -806,13 +806,20 @@ export function detectDeferrals(
     }
   }
 
-  // Stage 4 — colour flag: red text no pattern caught is still a hold.
+  // Stage 4 — colour flag. Red is not a hold in itself: on one sheet it marks
+  // an item in abeyance, on another it is simply emphasis. Red always
+  // escalates severity; it only classifies as a hold where hold language is
+  // actually present. Otherwise the note is classified by what it says.
 
   for (const { item, region } of items) {
     if (region === "titleblock") continue;
     const text = item.str.trim();
     if (text.length < 8 || !isRedish(item.colour) || excluded(text)) continue;
     if (findings.some((f) => text.includes(f.raw_text) || f.raw_text.includes(text))) continue;
+    const named = isOriginatorParty(extractDeferredTo(text), originator)
+      ? null
+      : extractDeferredTo(text);
+    const onHold = HOLD_LANGUAGE.test(text);
     findings.push({
       raw_text: text,
       region,
@@ -820,16 +827,18 @@ export function detectDeferrals(
       colour: item.colour,
       font_size: item.fontSize,
       is_red: true,
-      deferral_category: "hold_status",
+      deferral_category: onHold ? "hold_status" : classifyRedByContent(text, named !== null),
       also_categories: [],
-      deferred_to: isOriginatorParty(extractDeferredTo(text), originator) ? null : extractDeferredTo(text),
+      deferred_to: named,
       severity: "high",
       commercial_risk: null,
-      recommended_action:
-        "Marked in red on the drawing. Confirm the item is resolved and re-issued before it is relied upon.",
+      recommended_action: onHold
+        ? "Marked in red and on hold. Confirm the item is resolved and re-issued before it is relied upon."
+        : "Highlighted in red on the drawing. Confirm who carries this requirement and that it is priced.",
       method: "colour",
     });
   }
+
 
   const order = { high: 0, medium: 1, low: 2 } as const;
   return findings.sort((a, b) => order[a.severity] - order[b.severity]);
