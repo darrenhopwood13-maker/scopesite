@@ -85,11 +85,14 @@ const PARTY_TYPE_LABEL: Record<string, string> = {
   unknown: "Type not known",
 };
 
-const APPOINTED_LABEL: Record<string, string> = {
-  yes: "Appointed",
-  no: "Not appointed",
-  unknown: "Not known",
-};
+// Appointment is only ever what the user set. Anything we do not recognise
+// reads as "Not known" — a report must never assert an appointment nobody
+// has confirmed.
+function appointedLabel(status: string | null | undefined): string {
+  if (status === "yes") return "Appointed";
+  if (status === "no") return "Not appointed";
+  return "Not known";
+}
 
 export function drawingLabel(d: ReportDrawing | undefined): string {
   if (!d) return "Unknown drawing";
