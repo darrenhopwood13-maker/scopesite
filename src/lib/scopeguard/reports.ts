@@ -317,6 +317,10 @@ export function reportToText(report: Report): string {
   lines.push(`Project: ${report.projectName}${report.projectClient ? ` — Client: ${report.projectClient}` : ""}`);
   lines.push(`Generated: ${formatDate(report.generatedAt)}`);
   lines.push("");
+  if (report.headline) {
+    lines.push(report.headline);
+    lines.push("");
+  }
   lines.push("Drawings covered:");
   if (report.drawings.length) {
     for (const d of report.drawings) {
