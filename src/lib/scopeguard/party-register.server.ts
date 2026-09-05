@@ -63,7 +63,9 @@ export async function refreshPartyRegister(
 
     // Generic "specialist" / "others" defers to nobody: no party is created,
     // and the deferral reverts to unnamed, which carries high severity.
-    if (isGenericPartyTerm(raw)) {
+    // Generic terms, and sentence fragments that are not a name at all, name
+    // nobody: the deferral reverts to unnamed and carries high severity.
+    if (isGenericPartyTerm(raw) || !isPartyNameLike(raw)) {
       await db
         .from("drawing_items")
         .update({ party_id: null, deferred_to: null, severity: "high" })
