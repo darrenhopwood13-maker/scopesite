@@ -21,8 +21,10 @@ Junctions treated as already covered (guidance and trades updated, terms kept): 
 ## 3. Deferral language
 
 Add the bible's vague-scope patterns: "as required", "to suit", "refer to specialist design", assumed or approximate position, pending survey / GI / approval, "to be agreed" / TBA, "to engineer's design", "manufacturer's details", "subject to approval". Plus explicit exclusions (exclude / excludes / excluding) as high — the bible's point being that an exclusion nobody picks up is the most reliable variation on a job.
+Plus warranty and guarantee responsibility — warranty / warranties, guarantee, single point responsibility, system warranty — high where no party is named. Warranty responsibility for a waterproofing, roofing, facade or tanking system is routinely unstated, so nobody has taken design responsibility for it as installed.
 
 Each carries the bible's own sentence as the recommended action, and its commercial risk where the bible states one. Patterns are checked against the existing set first so no duplicate wording is seeded.
+
 
 ## 4. Severity model
 
