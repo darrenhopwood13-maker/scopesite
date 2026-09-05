@@ -20,6 +20,7 @@ This plan stops after the narrative. No corroborations screen.
 Templated, deterministic, nothing written by AI. Exactly the specification's shape:
 
 - Opening line: topic name, drawing count, originator count.
+- A severity line stating the severity in words, in the narrative itself, and saying why where it was escalated — a printed card states it is high without needing a badge beside it.
 - One bullet per source, naming the originator, the drawing number and revision, and quoting the deferral verbatim.
 - The related-findings line, listing the contested interface items on the same topic from the same drawings, named by their drawing and quoted as written — for the façade/fire card this is the Siderise cavity barrier, the FPS-204 beam encasement, the plasterboard closing the gap and the fire seal on 2746.
 - Closing line: "No package currently owns this scope."
@@ -34,6 +35,9 @@ Both narratives printed in chat for you to read before anything is put on screen
 - **Party wall and boundary** — high, Foster 0002 and Veretec 2144, two originators, quoting the MB Survey Solutions note and the outer-face condition note.
 
 Other topics may also raise cards from the four sheets; those will be listed too so you can judge whether the keyword sets are firing too widely.
+
+And the misses, which are otherwise invisible: every deferral across the four sheets that matched no topic at all, quoted with its drawing, plus the count against the total. A keyword set that is too narrow only shows up as an absence, so it gets reported as explicitly as the hits.
+
 
 ## Technical notes
 
