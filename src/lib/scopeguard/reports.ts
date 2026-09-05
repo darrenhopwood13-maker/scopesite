@@ -218,7 +218,7 @@ export function buildReport(template: ReportTemplate, input: BuildInput): Report
         ],
       };
     })
-    .sort((a, b) => b.count - a.count || a.row[0].localeCompare(b.row[0]))
+    .sort((a, b) => b.count - a.count || (a.row[0] ?? "").localeCompare(b.row[0] ?? ""))
     .map((r) => r.row);
 
   const unnamed = deferrals.filter((i) => !i.party_id).length;
