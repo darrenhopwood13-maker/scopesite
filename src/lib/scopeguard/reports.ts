@@ -379,14 +379,28 @@ export function reportToText(report: Report): string {
     lines.push("  - No drawings in this scope");
   }
   lines.push("");
-  if (report.rows.length) {
+  const flat = (c: string) => c.replace(/\s*\n\s*/g, " ");
+  if (report.sections) {
+    for (const s of report.sections) {
+      lines.push(s.heading);
+      if (s.note) lines.push(s.note);
+      if (s.rows.length) {
+        lines.push(s.columns.join("\t"));
+        for (const row of s.rows) lines.push(row.map(flat).join("\t"));
+      } else {
+        lines.push(s.emptyMessage);
+      }
+      lines.push("");
+    }
+  } else if (report.rows.length) {
     lines.push(report.columns.join("\t"));
     for (const row of report.rows) {
-      lines.push(row.map((c) => c.replace(/\s*\n\s*/g, " ")).join("\t"));
+      lines.push(row.map(flat).join("\t"));
     }
   } else {
     lines.push(report.emptyMessage);
   }
+
   lines.push("");
   lines.push(DISCLAIMER);
   return lines.join("\n");
