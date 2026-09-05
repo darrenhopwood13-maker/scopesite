@@ -15,6 +15,7 @@ import {
   type ReportItem,
   type ReportParty,
   type ReportTemplate,
+  type ReportSection,
 } from "@/lib/scopeguard/reports";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -52,6 +53,7 @@ export function CreateReportDialog({ projectId, drawingId, drawingLabel }: Props
 function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & { onClose: () => void }) {
   const [template, setTemplate] = useState<ReportTemplate>("deferrals_register");
   const [scope, setScope] = useState<"drawing" | "project">(drawingId ? "drawing" : "project");
+  const [tradeCode, setTradeCode] = useState<string>("");
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -69,7 +71,7 @@ function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & {
     queryFn: async () => {
       const { data, error } = await db
         .from("drawings")
-        .select("id, drawing_number, file_name, revision, title, originator")
+        .select("id, drawing_number, file_name, revision, title, originator, triage_class")
         .eq("project_id", projectId)
         .order("drawing_number");
       if (error) throw error;
@@ -103,6 +105,24 @@ function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & {
     },
   });
 
+  const trades = useQuery({
+    queryKey: ["report-trades"],
+    queryFn: async () => {
+      const { data, error } = await db.from("trades").select("code, name, sort_order").order("sort_order");
+      if (error) throw error;
+      return (data ?? []) as Array<{ code: string; name: string; sort_order: number }>;
+    },
+  });
+
+  const cues = useQuery({
+    queryKey: ["report-trade-cues"],
+    queryFn: async () => {
+      const { data, error } = await db.from("trade_cues").select("trade_code, cue");
+      if (error) throw error;
+      return (data ?? []) as Array<{ trade_code: string; cue: string }>;
+    },
+  });
+
   const loading = project.isLoading || drawings.isLoading || items.isLoading || parties.isLoading;
 
   const report: Report | null = useMemo(() => {
@@ -110,7 +130,12 @@ function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & {
     const inScope =
       scope === "drawing" && drawingId ? drawings.data.filter((d) => d.id === drawingId) : drawings.data;
     const ids = new Set(inScope.map((d) => d.id));
+    const tradeNames = Object.fromEntries((trades.data ?? []).map((t) => [t.code, t.name]));
+    const picked = (trades.data ?? []).find((t) => t.code === tradeCode) ?? null;
     return buildReport(template, {
+      trade: picked ? { code: picked.code, name: picked.name } : null,
+      tradeCues: cues.data ?? [],
+      tradeNames,
       projectName: project.data.name,
       projectClient: project.data.client,
       drawings: inScope,
@@ -121,7 +146,19 @@ function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & {
           ? drawingWithRevision(inScope[0]) || (drawingLabel ?? "this drawing")
           : project.data.name,
     });
-  }, [project.data, drawings.data, items.data, parties.data, scope, template, drawingId, drawingLabel]);
+  }, [
+    project.data,
+    drawings.data,
+    items.data,
+    parties.data,
+    trades.data,
+    cues.data,
+    tradeCode,
+    scope,
+    template,
+    drawingId,
+    drawingLabel,
+  ]);
 
   const downloadPdf = async () => {
     if (!report) return;
@@ -175,21 +212,48 @@ function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & {
       }
       y += 8;
 
-      if (report.rows.length) {
-        autoTable(doc, {
-          head: [report.columns],
-          body: report.rows,
-          startY: y,
-          margin: { left: margin, right: margin, bottom: 60 },
-          styles: { fontSize: 8, cellPadding: 4, overflow: "linebreak", valign: "top" },
-          headStyles: { fillColor: [238, 240, 244], textColor: 20, fontStyle: "bold" },
-        });
-        y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 18;
+      const drawTable = (columns: string[], rows: string[][], empty: string) => {
+        if (rows.length) {
+          autoTable(doc, {
+            head: [columns],
+            body: rows,
+            startY: y,
+            margin: { left: margin, right: margin, bottom: 60 },
+            styles: { fontSize: 8, cellPadding: 4, overflow: "linebreak", valign: "top" },
+            headStyles: { fillColor: [238, 240, 244], textColor: 20, fontStyle: "bold" },
+          });
+          y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 18;
+        } else {
+          doc.setFont("helvetica", "italic");
+          doc.text(empty, margin, y);
+          doc.setFont("helvetica", "normal");
+          y += 20;
+        }
+      };
+
+      if (report.sections) {
+        for (const section of report.sections) {
+          if (y > doc.internal.pageSize.getHeight() - 120) {
+            doc.addPage();
+            y = margin;
+          }
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(11);
+          doc.text(section.heading, margin, y);
+          y += 13;
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          if (section.note) {
+            for (const line of doc.splitTextToSize(section.note, width - margin * 2) as string[]) {
+              doc.text(line, margin, y);
+              y += 11;
+            }
+          }
+          y += 4;
+          drawTable(section.columns, section.rows, section.emptyMessage);
+        }
       } else {
-        doc.setFont("helvetica", "italic");
-        doc.text(report.emptyMessage, margin, y);
-        doc.setFont("helvetica", "normal");
-        y += 20;
+        drawTable(report.columns, report.rows, report.emptyMessage);
       }
 
       if (y > doc.internal.pageSize.getHeight() - 70) {
@@ -242,10 +306,25 @@ function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & {
         [],
       ];
       const sheet = XLSX.utils.aoa_to_sheet(header);
-      if (report.rows.length) {
-        XLSX.utils.sheet_add_aoa(sheet, [report.columns, ...report.rows], { origin: -1 });
+      const addTable = (section: Pick<ReportSection, "columns" | "rows" | "emptyMessage">) => {
+        if (section.rows.length) {
+          XLSX.utils.sheet_add_aoa(sheet, [section.columns, ...section.rows], { origin: -1 });
+        } else {
+          XLSX.utils.sheet_add_aoa(sheet, [[section.emptyMessage]], { origin: -1 });
+        }
+      };
+      if (report.sections) {
+        for (const section of report.sections) {
+          XLSX.utils.sheet_add_aoa(
+            sheet,
+            section.note ? [[section.heading], [section.note]] : [[section.heading]],
+            { origin: -1 },
+          );
+          addTable(section);
+          XLSX.utils.sheet_add_aoa(sheet, [[]], { origin: -1 });
+        }
       } else {
-        XLSX.utils.sheet_add_aoa(sheet, [[report.emptyMessage]], { origin: -1 });
+        addTable(report);
       }
       XLSX.utils.sheet_add_aoa(sheet, [[], [DISCLAIMER]], { origin: -1 });
       const book = XLSX.utils.book_new();
@@ -323,6 +402,30 @@ function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & {
           </div>
         </fieldset>
 
+        {template === "package_scope_gap" ? (
+          <fieldset className="space-y-2">
+            <legend className="text-xs uppercase tracking-wide text-muted-foreground">Package</legend>
+            <select
+              value={tradeCode}
+              onChange={(e) => setTradeCode(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              aria-label="Trade package"
+            >
+              <option value="">Choose a trade…</option>
+              {(trades.data ?? []).map((t) => (
+                <option key={t.code} value={t.code}>
+                  {t.name} ({t.code})
+                </option>
+              ))}
+            </select>
+            {!tradeCode ? (
+              <p className="text-xs text-muted-foreground">
+                Pick the trade whose package this report is for.
+              </p>
+            ) : null}
+          </fieldset>
+        ) : null}
+
         <p className="text-xs text-muted-foreground">
           {loading
             ? "Loading the readings for this project…"
@@ -336,21 +439,21 @@ function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={downloadPdf}
-            disabled={busy || !report}
+            disabled={busy || !report || (template === "package_scope_gap" && !tradeCode)}
             className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground disabled:opacity-50"
           >
             Download PDF
           </button>
           <button
             onClick={copyReport}
-            disabled={busy || !report}
+            disabled={busy || !report || (template === "package_scope_gap" && !tradeCode)}
             className="rounded-md border border-border px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             Copy to clipboard
           </button>
           <button
             onClick={exportExcel}
-            disabled={busy || !report}
+            disabled={busy || !report || (template === "package_scope_gap" && !tradeCode)}
             className="rounded-md border border-border px-4 py-2 text-sm font-medium text-muted-foreground disabled:opacity-50"
           >
             Export to Excel
