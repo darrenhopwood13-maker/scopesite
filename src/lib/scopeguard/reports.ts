@@ -71,6 +71,7 @@ export type Report = {
   columns: string[];
   rows: string[][];
   emptyMessage: string;
+  headline?: string;
 };
 
 const SEVERITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
