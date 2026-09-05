@@ -68,18 +68,21 @@ export type Database = {
           id: string
           keywords: string[]
           name: string
+          require_any: string[]
           severity: string
         }
         Insert: {
           id?: string
           keywords: string[]
           name: string
+          require_any?: string[]
           severity?: string
         }
         Update: {
           id?: string
           keywords?: string[]
           name?: string
+          require_any?: string[]
           severity?: string
         }
         Relationships: []
