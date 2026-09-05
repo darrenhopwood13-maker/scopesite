@@ -515,12 +515,17 @@ export function namedParty(text: string): string | null {
     const cleaned = cleanParty(trimToName(company[1]));
     if (cleaned) return cleaned;
   }
-  const m = text.match(/\b(?:by|BY|By)\s+([A-Z][A-Z&.'-]{1,9})\b/);
+  // "(BHC to confirm)" names BHC just as plainly as "BY BHC".
+  const responsible = text.match(
+    /\b([A-Z][A-Za-z&.'-]{1,14})\s+to\s+(?:confirm|advise|design|approve|provide|verify|check|issue)\b/,
+  );
+  const m = text.match(/\b(?:by|BY|By)\s+([A-Z][A-Z&.'-]{1,9})\b/) ?? responsible;
   if (!m?.[1]) return null;
   const party = m[1].trim();
-  if (party.split(/\s+/).some((w) => NOT_A_PARTY.has(w))) return null;
+  if (party.split(/\s+/).some((w) => NOT_A_PARTY.has(w.toUpperCase()))) return null;
   if (PARTY_WORDS.test(party)) return null; // handled by the phrase parser
   return party;
+
 }
 
 
