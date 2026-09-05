@@ -796,7 +796,7 @@ export function detectDeferrals(
         deferral_category: "by_others",
         also_categories: [],
         deferred_to: named,
-        severity: isRed ? "high" : "medium",
+        severity: applySeverityModel("medium", text, { partyNamed: true, isRed }),
         commercial_risk: null,
         recommended_action: `Confirm what ${named} is providing and where the boundary with the main contract sits.`,
         method: "named_party",
