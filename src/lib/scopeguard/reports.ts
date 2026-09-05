@@ -34,6 +34,7 @@ export type ReportDrawing = {
   revision: string | null;
   title: string | null;
   originator?: string | null;
+  triage_class?: string | null;
 };
 
 export type ReportItem = {
@@ -61,6 +62,15 @@ export type ReportParty = {
   appointed_status: string;
 };
 
+/** One titled table in a multi-part report. */
+export type ReportSection = {
+  heading: string;
+  note?: string;
+  columns: string[];
+  rows: string[][];
+  emptyMessage: string;
+};
+
 export type Report = {
   template: ReportTemplate;
   title: string;
@@ -72,7 +82,10 @@ export type Report = {
   rows: string[][];
   emptyMessage: string;
   headline?: string;
+  /** Present on multi-section templates; when set, renderers use it instead of columns/rows. */
+  sections?: ReportSection[];
 };
+
 
 const SEVERITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 const SEVERITY_LABEL: Record<string, string> = { high: "High", medium: "Medium", low: "Low" };
