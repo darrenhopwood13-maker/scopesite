@@ -309,13 +309,26 @@ export function reportToHtml(report: Report): string {
     ? report.drawings.map((d) => `<li>${escapeHtml(drawingWithRevision(d))}${d.title ? ` — ${escapeHtml(d.title)}` : ""}</li>`).join("")
     : "<li>No drawings in this scope</li>";
 
-  const body = report.rows.length
-    ? `<table><thead><tr>${report.columns
-        .map((c) => `<th>${escapeHtml(c)}</th>`)
-        .join("")}</tr></thead><tbody>${report.rows
-        .map((r) => `<tr>${r.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`)
-        .join("")}</tbody></table>`
-    : `<p class="empty">${escapeHtml(report.emptyMessage)}</p>`;
+  const table = (columns: string[], rows: string[][], empty: string) =>
+    rows.length
+      ? `<table><thead><tr>${columns
+          .map((c) => `<th>${escapeHtml(c)}</th>`)
+          .join("")}</tr></thead><tbody>${rows
+          .map((r) => `<tr>${r.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`)
+          .join("")}</tbody></table>`
+      : `<p class="empty">${escapeHtml(empty)}</p>`;
+
+  const body = report.sections
+    ? report.sections
+        .map(
+          (s) =>
+            `<h2>${escapeHtml(s.heading)}</h2>${
+              s.note ? `<p class="meta">${escapeHtml(s.note)}</p>` : ""
+            }${table(s.columns, s.rows, s.emptyMessage)}`,
+        )
+        .join("")
+    : table(report.columns, report.rows, report.emptyMessage);
+
 
   return `<!doctype html><html lang="en-GB"><head><meta charset="utf-8"><title>${escapeHtml(
     report.title,
