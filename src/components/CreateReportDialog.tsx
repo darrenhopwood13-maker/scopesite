@@ -402,6 +402,30 @@ function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & {
           </div>
         </fieldset>
 
+        {template === "package_scope_gap" ? (
+          <fieldset className="space-y-2">
+            <legend className="text-xs uppercase tracking-wide text-muted-foreground">Package</legend>
+            <select
+              value={tradeCode}
+              onChange={(e) => setTradeCode(e.target.value)}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              aria-label="Trade package"
+            >
+              <option value="">Choose a trade…</option>
+              {(trades.data ?? []).map((t) => (
+                <option key={t.code} value={t.code}>
+                  {t.name} ({t.code})
+                </option>
+              ))}
+            </select>
+            {!tradeCode ? (
+              <p className="text-xs text-muted-foreground">
+                Pick the trade whose package this report is for.
+              </p>
+            ) : null}
+          </fieldset>
+        ) : null}
+
         <p className="text-xs text-muted-foreground">
           {loading
             ? "Loading the readings for this project…"
@@ -415,21 +439,21 @@ function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={downloadPdf}
-            disabled={busy || !report}
+            disabled={busy || !report || (template === "package_scope_gap" && !tradeCode)}
             className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-foreground disabled:opacity-50"
           >
             Download PDF
           </button>
           <button
             onClick={copyReport}
-            disabled={busy || !report}
+            disabled={busy || !report || (template === "package_scope_gap" && !tradeCode)}
             className="rounded-md border border-border px-4 py-2 text-sm font-medium disabled:opacity-50"
           >
             Copy to clipboard
           </button>
           <button
             onClick={exportExcel}
-            disabled={busy || !report}
+            disabled={busy || !report || (template === "package_scope_gap" && !tradeCode)}
             className="rounded-md border border-border px-4 py-2 text-sm font-medium text-muted-foreground disabled:opacity-50"
           >
             Export to Excel
