@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { analyseDrawing } from "@/lib/scopeguard/analyse.functions";
+import { deleteDrawings } from "@/lib/scopeguard/delete.functions";
 import { AccountBar } from "@/components/AccountBar";
 import { Disclaimer } from "@/components/Disclaimer";
 import { PartyRegister } from "@/components/PartyRegister";
@@ -44,8 +45,45 @@ function ProjectPage() {
   const { projectId } = Route.useParams();
   const qc = useQueryClient();
   const analyse = useServerFn(analyseDrawing);
+  const removeFn = useServerFn(deleteDrawings);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+
+  const runDelete = useCallback(
+    async (payload: { projectId: string; drawingIds?: string[]; all?: boolean }) => {
+      setDeleting(true);
+      setMessage(null);
+      try {
+        await removeFn({ data: payload });
+        setSelected(new Set());
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : String(error));
+      } finally {
+        setDeleting(false);
+        qc.invalidateQueries({ queryKey: ["drawings", projectId] });
+        qc.invalidateQueries({ queryKey: ["parties", projectId] });
+        qc.invalidateQueries({ queryKey: ["party-counts", projectId] });
+        qc.invalidateQueries({ queryKey: ["party-corroborations", projectId] });
+      }
+    },
+    [projectId, qc, removeFn],
+  );
+
+  const removeDrawings = useCallback(
+    async (ids: string[], confirmation: string) => {
+      if (!ids.length || !window.confirm(confirmation)) return;
+      await runDelete({ projectId, drawingIds: ids });
+    },
+    [projectId, runDelete],
+  );
+
+  const deleteEverything = useCallback(async () => {
+    const typed = window.prompt('This removes every drawing, finding and stored file in this project. Type DELETE ALL to confirm.');
+    if (typed?.trim().toUpperCase() !== "DELETE ALL") return;
+    await runDelete({ projectId, all: true });
+  }, [projectId, runDelete]);
 
   const project = useQuery({
     queryKey: ["project", projectId],
@@ -202,26 +240,81 @@ function ProjectPage() {
         {drawings.data?.length === 0 ? (
           <p className="text-muted-foreground">No drawings uploaded yet.</p>
         ) : null}
+
+        {drawings.data?.length ? (
+          <div className="flex flex-wrap items-center gap-3 text-sm">
+            <span className="text-muted-foreground">
+              {selected.size ? `${selected.size} selected` : "Select drawings to remove them"}
+            </span>
+            <button
+              type="button"
+              disabled={!selected.size || deleting}
+              onClick={() => removeDrawings([...selected], `Delete ${selected.size} selected drawing(s)? This cannot be undone.`)}
+              className="rounded border border-border px-3 py-1 disabled:opacity-40 hover:border-destructive hover:text-destructive"
+            >
+              Delete selected
+            </button>
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={deleteEverything}
+              className="rounded border border-border px-3 py-1 disabled:opacity-40 hover:border-destructive hover:text-destructive"
+            >
+              Delete all drawings in this project
+            </button>
+          </div>
+        ) : null}
+
         {drawings.data?.map((d) => (
-          <Link
+          <div
             key={d.id}
-            to="/drawings/$drawingId"
-            params={{ drawingId: d.id }}
-            className="flex items-center justify-between rounded-lg border border-border bg-card p-4 hover:border-primary"
+            className="flex items-center gap-4 rounded-lg border border-border bg-card p-4"
           >
-            <div>
-              <div className="font-display">{d.drawing_number ?? d.file_name}</div>
-              <div className="text-sm text-muted-foreground">
-                {[d.title, d.revision ? `Rev ${d.revision}` : null, d.triage_class?.replace(/_/g, " ")]
-                  .filter(Boolean)
-                  .join(" · ")}
+            <input
+              type="checkbox"
+              aria-label={`Select ${d.drawing_number ?? d.file_name}`}
+              checked={selected.has(d.id)}
+              onChange={(e) => {
+                setSelected((prev) => {
+                  const next = new Set(prev);
+                  if (e.target.checked) next.add(d.id);
+                  else next.delete(d.id);
+                  return next;
+                });
+              }}
+            />
+            <Link
+              to="/drawings/$drawingId"
+              params={{ drawingId: d.id }}
+              className="flex flex-1 items-center justify-between gap-4 hover:text-primary"
+            >
+              <div>
+                <div className="font-display">{d.drawing_number ?? d.file_name}</div>
+                <div className="text-sm text-muted-foreground">
+                  {[d.title, d.revision ? `Rev ${d.revision}` : null, d.triage_class?.replace(/_/g, " ")]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+                {d.status === "failed" && d.error_message ? (
+                  <div className="text-sm text-destructive">{d.error_message}</div>
+                ) : null}
               </div>
-              {d.status === "failed" && d.error_message ? (
-                <div className="text-sm text-destructive">{d.error_message}</div>
-              ) : null}
-            </div>
-            <span className="text-sm text-muted-foreground">{statusLabel(d.status)}</span>
-          </Link>
+              <span className="text-sm text-muted-foreground">{statusLabel(d.status)}</span>
+            </Link>
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={() =>
+                removeDrawings(
+                  [d.id],
+                  `Delete ${d.drawing_number ?? d.file_name}${d.revision ? ` Rev ${d.revision}` : ""}? Its findings and stored file are removed for good.`,
+                )
+              }
+              className="rounded border border-border px-3 py-1 text-sm disabled:opacity-40 hover:border-destructive hover:text-destructive"
+            >
+              Delete
+            </button>
+          </div>
         ))}
       </section>
 
