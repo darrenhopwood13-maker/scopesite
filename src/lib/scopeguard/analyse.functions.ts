@@ -233,6 +233,7 @@ export const analyseDrawing = createServerFn({ method: "POST" })
             colour: item.colour,
             font_size: item.fontSize,
             is_red: false,
+            severity: contestedSeverity(t, a.interface_guidance, a.interface_severity),
             // Always explicit: a bulk insert sends every key present on any row,
             // so an omitted key here would be written as NULL, not defaulted.
             also_categories: [] as string[],

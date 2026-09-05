@@ -686,6 +686,23 @@ export function applySeverityModel(
 }
 
 
+/**
+ * Severity for a contested (non-deferral) item. The bible makes no
+ * distinction between a note and an annotation: a cavity barrier at a
+ * compartment line is life safety wherever it is written, so any item whose
+ * own text or whose interface rule touches life safety is high regardless of
+ * the rule's base severity. Nothing here can lower an item.
+ */
+export function contestedSeverity(
+  text: string,
+  interfaceGuidance: string | null | undefined,
+  base: string | null | undefined,
+): Finding["severity"] | null {
+  if (LIFE_SAFETY.test(`${text} ${interfaceGuidance ?? ""}`)) return "high";
+  if (base === "high" || base === "medium" || base === "low") return base;
+  return null;
+}
+
 /* ------------------------------------------------------------------ */
 /* Red is emphasis unless the words say hold                            */
 /* ------------------------------------------------------------------ */
