@@ -149,6 +149,17 @@ function ReportPicker({ projectId, drawingId, drawingLabel, onClose }: Props & {
       y += 12;
       doc.text(`Generated: ${formatDate(report.generatedAt)}`, margin, y);
       y += 16;
+      if (report.headline) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        for (const line of doc.splitTextToSize(report.headline, width - margin * 2) as string[]) {
+          doc.text(line, margin, y);
+          y += 13;
+        }
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        y += 6;
+      }
       doc.setFont("helvetica", "bold");
       doc.text("Drawings covered", margin, y);
       doc.setFont("helvetica", "normal");
