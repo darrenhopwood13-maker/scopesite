@@ -45,8 +45,45 @@ function ProjectPage() {
   const { projectId } = Route.useParams();
   const qc = useQueryClient();
   const analyse = useServerFn(analyseDrawing);
+  const removeFn = useServerFn(deleteDrawings);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+
+  const runDelete = useCallback(
+    async (payload: { projectId: string; drawingIds?: string[]; all?: boolean }) => {
+      setDeleting(true);
+      setMessage(null);
+      try {
+        await removeFn({ data: payload });
+        setSelected(new Set());
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : String(error));
+      } finally {
+        setDeleting(false);
+        qc.invalidateQueries({ queryKey: ["drawings", projectId] });
+        qc.invalidateQueries({ queryKey: ["parties", projectId] });
+        qc.invalidateQueries({ queryKey: ["party-counts", projectId] });
+        qc.invalidateQueries({ queryKey: ["party-corroborations", projectId] });
+      }
+    },
+    [projectId, qc, removeFn],
+  );
+
+  const removeDrawings = useCallback(
+    async (ids: string[], confirmation: string) => {
+      if (!ids.length || !window.confirm(confirmation)) return;
+      await runDelete({ projectId, drawingIds: ids });
+    },
+    [projectId, runDelete],
+  );
+
+  const deleteEverything = useCallback(async () => {
+    const typed = window.prompt('This removes every drawing, finding and stored file in this project. Type DELETE ALL to confirm.');
+    if (typed?.trim().toUpperCase() !== "DELETE ALL") return;
+    await runDelete({ projectId, all: true });
+  }, [projectId, runDelete]);
 
   const project = useQuery({
     queryKey: ["project", projectId],
