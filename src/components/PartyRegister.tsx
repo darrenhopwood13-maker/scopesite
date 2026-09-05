@@ -13,6 +13,7 @@ type Party = {
   appointed_status: string;
   needs_review: boolean;
   review_reason: string | null;
+  disclaimer_note: string | null;
 };
 
 type Alias = { party_id: string; alias: string };
@@ -60,7 +61,7 @@ export function PartyRegister({ projectId }: { projectId: string }) {
     queryFn: async () => {
       const { data, error } = await db
         .from("parties")
-        .select("id, canonical_name, party_type, appointed_status, needs_review, review_reason")
+        .select("id, canonical_name, party_type, appointed_status, needs_review, review_reason, disclaimer_note")
         .eq("project_id", projectId)
         .order("canonical_name");
       if (error) throw error;
