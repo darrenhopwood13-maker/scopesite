@@ -513,3 +513,17 @@ drop policy if exists "own corroboration items" on public.corroboration_items;
 create policy "own corroboration items" on public.corroboration_items for all to authenticated
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 -- end of db/phase3-parties.sql
+
+-- Phase 3 step 3 — corroboration topics (see db/phase3-topics.sql for the seed).
+create table if not exists public.corroboration_topics (
+  id       uuid primary key default gen_random_uuid(),
+  name     text not null unique,
+  keywords text[] not null,
+  severity text not null default 'high'
+    constraint corroboration_topics_severity_check check (severity in ('low','medium','high'))
+);
+grant select on public.corroboration_topics to authenticated;
+grant all on public.corroboration_topics to service_role;
+alter table public.corroboration_topics enable row level security;
+create policy "topics readable" on public.corroboration_topics
+  for select to authenticated using (true);
