@@ -162,6 +162,84 @@ export function isAnnotationOnly(text: string): boolean {
   return ANNOTATION_ONLY.some((re) => re.test(t));
 }
 
+/* ------------------------------------------------------------------ */
+/* Titleblock location by content                                      */
+/* ------------------------------------------------------------------ */
+
+// A titleblock is recognisable by its field labels, not by where it sits.
+// Bottom strips, left strips and corner blocks are all normal, and a
+// position-only rule fails silently on them: everything becomes body text and
+// drawn-by initials end up asking to be allocated to a trade.
+const TB_LABELS: RegExp[] = [
+  /^drawing\s*(no\.?|number)\b/i,
+  /^dwg\s*(no\.?|number)\b/i,
+  /^(rev|revision)\b\.?:?$/i,
+  /^scale\b\.?:?/i,
+  /^drawn\b\.?:?/i,
+  /^(checked|chkd|approved|authorised|authorized)\b\.?:?/i,
+  /^client\b\.?:?/i,
+  /^project\b(\s*(no\.?|number|name))?\.?:?/i,
+  /^(job|contract)\s*(no\.?|number)\b/i,
+  /^date\b\.?:?$/i,
+  /^(title|drawing title|sheet title)\b\.?:?/i,
+  /^(status|suitability|purpose of issue)\b\.?:?/i,
+  /^(originator|designer|architect|engineer)\b\.?:?$/i,
+  /^description$/i,
+  /^sheet\s*(no\.?|size)?\b/i,
+];
+
+export type Box = { x0: number; y0: number; x1: number; y1: number };
+
+export function findTitleblockBox(
+  lines: Array<{ str: string; x: number; y: number; width?: number; height?: number }>,
+  pageWidth: number,
+  pageHeight: number,
+): Box | null {
+  const hits = lines.filter((l) => TB_LABELS.some((re) => re.test(l.str.trim())));
+  if (hits.length < 4) return null;
+
+  // Single-linkage clustering: labels belonging to one titleblock sit close
+  // together wherever that block is placed on the sheet.
+  const radius = Math.hypot(pageWidth, pageHeight) * 0.16;
+  const clusters: Array<typeof hits> = [];
+  for (const h of hits) {
+    const near = clusters.filter((c) =>
+      c.some((m) => Math.hypot(m.x - h.x, m.y - h.y) <= radius),
+    );
+    if (!near.length) {
+      clusters.push([h]);
+      continue;
+    }
+    const first = near[0]!;
+    first.push(h);
+    for (const other of near.slice(1)) {
+      first.push(...other);
+      clusters.splice(clusters.indexOf(other), 1);
+    }
+  }
+
+  const best = clusters.sort((a, b) => b.length - a.length)[0];
+  if (!best || best.length < 4) return null;
+
+  const padX = pageWidth * 0.03;
+  const padY = pageHeight * 0.03;
+  const box: Box = {
+    x0: Math.min(...best.map((l) => l.x)) - padX,
+    y0: Math.min(...best.map((l) => l.y)) - padY,
+    x1: Math.max(...best.map((l) => l.x + (l.width ?? 0))) + padX * 2,
+    y1: Math.max(...best.map((l) => l.y + (l.height ?? 0))) + padY,
+  };
+  // A "titleblock" covering most of the sheet is a bad match, not a titleblock.
+  const area = ((box.x1 - box.x0) * (box.y1 - box.y0)) / (pageWidth * pageHeight);
+  if (area > 0.5) return null;
+  return box;
+}
+
+export function inBox(box: Box, x: number, y: number): boolean {
+  return x >= box.x0 && x <= box.x1 && y >= box.y0 && y <= box.y1;
+}
+
+
 export type TriageClass = "annotation_rich" | "notes_only" | "graphical_only" | "unreadable";
 
 export function triage(input: {
