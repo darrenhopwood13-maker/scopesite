@@ -213,10 +213,21 @@ function DrawingPage() {
     }
   }, [all]);
 
-  const selectOnSheet = (id: string) => {
+  /** From the register: move the sheet to it. */
+  const selectFromList = (item: Item) => {
+    if (!locatable(item)) return;
+    setSelectedId(item.id);
+    if (narrow) setPane("drawing");
+  };
+
+  /** From the sheet: select the row and bring it into view. */
+  const selectFromSheet = (id: string) => {
     setSelectedId(id);
-    setPane("drawing");
-    document.getElementById(`finding-${id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (narrow) setPane("findings");
+    window.setTimeout(
+      () => document.getElementById(`finding-${id}`)?.scrollIntoView({ block: "center", behavior: "smooth" }),
+      narrow ? 60 : 0,
+    );
   };
   const deferrals = useMemo(() => all.filter((i) => i.item_type === ITEM_TYPE.deferral), [all]);
   const contested = useMemo(() => all.filter((i) => effectiveStatus(i) === "ambiguous"), [all]);
@@ -336,6 +347,29 @@ function DrawingPage() {
 
       <Disclaimer />
 
+      {narrow ? (
+        <nav className="flex gap-1" aria-label="Findings or drawing">
+          {(["findings", "drawing"] as const).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPane(p)}
+              aria-current={pane === p ? "page" : undefined}
+              className={`rounded-md px-3 py-2 text-sm font-medium ${
+                pane === p ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {p === "findings" ? "Findings" : "Drawing"}
+            </button>
+          ))}
+        </nav>
+      ) : null}
+
+      <div ref={splitRef} className="flex gap-0 items-start">
+        <div
+          className={`${narrow && pane !== "findings" ? "hidden" : "block"} min-w-0 space-y-8 ${narrow ? "w-full" : ""}`}
+          style={narrow ? undefined : { width: `${split}%` }}
+        >
+
       {tab === "deferrals" ? (
         <section className="space-y-4">
           {d?.status === DRAWING_STATUS.failed ? (
@@ -356,7 +390,15 @@ function DrawingPage() {
           ) : null}
 
           {deferrals.map((i) => (
-            <article key={i.id} className="rounded-lg border border-border bg-card p-4 space-y-2">
+            <article
+              key={i.id}
+              id={`finding-${i.id}`}
+              onMouseEnter={() => setHoveredId(i.id)}
+              onMouseLeave={() => setHoveredId((v) => (v === i.id ? null : v))}
+              className={`rounded-lg border bg-card p-4 space-y-2 ${
+                selectedId === i.id ? "border-accent ring-1 ring-accent" : "border-border"
+              }`}
+            >
               <div className="flex items-center gap-3 text-sm">
                 <span className={`font-medium uppercase ${SEVERITY_STYLES[i.severity ?? "low"] ?? ""}`}>
                   {i.severity}
@@ -383,6 +425,16 @@ function DrawingPage() {
                   <dd>{i.recommended_action ?? "—"}</dd>
                 </div>
               </dl>
+              {locatable(i) ? (
+                <button
+                  onClick={() => selectFromList(i)}
+                  className="rounded-md border border-border px-3 py-1 text-sm font-medium"
+                >
+                  Show on sheet
+                </button>
+              ) : (
+                <p className="text-sm text-muted-foreground">Location not available on sheet</p>
+              )}
             </article>
           ))}
         </section>
@@ -439,6 +491,39 @@ function DrawingPage() {
           </p>
         </section>
       ) : null}
+        </div>
+
+        {narrow ? null : (
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            onMouseDown={startDrag}
+            className="mx-2 w-1 shrink-0 cursor-col-resize self-stretch rounded bg-border hover:bg-accent"
+          />
+        )}
+
+        <div
+          className={`${narrow && pane !== "drawing" ? "hidden" : "block"} min-w-0 flex-1 ${narrow ? "w-full" : ""}`}
+        >
+          <DrawingViewer
+            drawingId={drawingId}
+            pageWidth={d?.page_width ? Number(d.page_width) : null}
+            pageHeight={d?.page_height ? Number(d.page_height) : null}
+            items={all.map((i) => ({
+              id: i.id,
+              severity: i.severity,
+              bbox: i.bbox,
+              bbox_frame: i.bbox_frame,
+              font_size: i.font_size,
+            }))}
+            selectedId={selectedId}
+            hoveredId={hoveredId}
+            showAll={showAll}
+            onToggleShowAll={setShowAll}
+            onSelect={selectFromSheet}
+          />
+        </div>
+      </div>
     </main>
   );
 }
