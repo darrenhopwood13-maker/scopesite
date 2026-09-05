@@ -387,3 +387,198 @@ export function reportFileName(report: Report, extension: string): string {
   const stamp = report.generatedAt.toISOString().slice(0, 10);
   return `${slug}-${stamp}.${extension}`;
 }
+
+/* ---------------------------------------------------------------- */
+/* Package scope gap report                                          */
+/* ---------------------------------------------------------------- */
+
+type ReportBase = Pick<Report, "template" | "projectName" | "projectClient" | "generatedAt" | "drawings">;
+
+const TRIAGE_LABEL: Record<string, string> = {
+  annotation_rich: "Annotation rich",
+  notes_only: "Notes only — annotations not read",
+  graphical_only: "Graphical only — no readable text",
+  unreadable: "Unreadable",
+};
+
+const norm = (s: string) => ` ${s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()} `;
+
+function mentionsCue(text: string, cues: string[]): string | null {
+  const hay = norm(text);
+  for (const cue of cues) {
+    const c = norm(cue);
+    if (c.trim().length < 3) continue;
+    if (hay.includes(c)) return cue.trim();
+  }
+  return null;
+}
+
+/** The trade an item is actually allocated to, honouring a user correction. */
+function effectiveTrade(item: ReportItem): string | null {
+  return item.corrected_trade_code ?? item.allocated_trade_code ?? null;
+}
+
+function tradeList(codes: string[], names: Record<string, string>): string {
+  return codes.map((c) => `${c}${names[c] ? ` ${names[c]}` : ""}`).join(", ");
+}
+
+function buildPackageReport(
+  base: ReportBase,
+  input: BuildInput,
+  byId: Map<string, ReportDrawing>,
+): Report {
+  const trade = input.trade ?? { code: "", name: "No trade selected" };
+  const names = input.tradeNames ?? {};
+  const cues = (input.tradeCues ?? []).filter((c) => c.trade_code === trade.code).map((c) => c.cue);
+  const live = input.items.filter((i) => i.correction_status !== "dismissed");
+
+  // 1. Contested — this trade named as a candidate, or allocated but ambiguous.
+  const contested = live
+    .filter(
+      (i) =>
+        effectiveStatus(i) === "ambiguous" &&
+        (candidateCodes(i).includes(trade.code) || effectiveTrade(i) === trade.code),
+    )
+    .sort(bySeverity);
+
+  // 2. Clearly allocated to this trade.
+  const allocated = live
+    .filter((i) => effectiveStatus(i) === "allocated" && effectiveTrade(i) === trade.code)
+    .sort(
+      (a, b) =>
+        drawingLabel(byId.get(a.drawing_id)).localeCompare(drawingLabel(byId.get(b.drawing_id))) ||
+        bySeverity(a, b),
+    );
+
+  // 3. Deferrals that could land here: on a sheet this trade already works on,
+  //    or whose own wording matches this trade's cues. Never asserted as ours.
+  const tradeDrawingIds = new Set([...contested, ...allocated].map((i) => i.drawing_id));
+  const maybe = live
+    .filter((i) => i.item_type === "deferral")
+    .map((i) => {
+      const cue = mentionsCue(i.raw_text, cues);
+      const onSheet = tradeDrawingIds.has(i.drawing_id);
+      if (!cue && !onSheet) return null;
+      return {
+        item: i,
+        why: cue
+          ? `Wording matches this package (“${cue}”)`
+          : "On a drawing where this package already carries work",
+      };
+    })
+    .filter((x): x is { item: ReportItem; why: string } => x !== null)
+    .sort((a, b) => bySeverity(a.item, b.item));
+
+  // 4. Parties named on any item touching this package.
+  const partyIds = new Set(
+    [...contested, ...allocated, ...maybe.map((m) => m.item)]
+      .map((i) => i.party_id)
+      .filter((p): p is string => Boolean(p)),
+  );
+  const partyRows = (input.parties ?? [])
+    .filter((p) => partyIds.has(p.id))
+    .map((p) => {
+      const count = [...contested, ...allocated, ...maybe.map((m) => m.item)].filter(
+        (i) => i.party_id === p.id,
+      ).length;
+      return [
+        p.canonical_name,
+        PARTY_TYPE_LABEL[p.party_type] ?? p.party_type,
+        appointedLabel(p.appointed_status),
+        String(count),
+      ];
+    })
+    .sort((a, b) => Number(b[3]) - Number(a[3]) || (a[0] ?? "").localeCompare(b[0] ?? ""));
+
+  const sections: ReportSection[] = [
+    {
+      heading: "1. Contested items — settle before the package is let",
+      note: "This package is one of the candidate trades on each of these. Nobody carries them until it is agreed in writing.",
+      columns: [
+        "Severity",
+        "Quoted from the drawing",
+        "Source",
+        "Other candidate trades",
+        "Interface guidance",
+      ],
+      rows: contested.map((i) => [
+        SEVERITY_LABEL[i.severity ?? "low"] ?? "Low",
+        i.raw_text,
+        drawingWithRevision(byId.get(i.drawing_id)),
+        tradeList(
+          candidateCodes(i).filter((c) => c !== trade.code),
+          names,
+        ) || "None named — confirm the boundary",
+        i.interface_guidance ?? "Confirm which package carries this item.",
+      ]),
+      emptyMessage: "No contested items name this package.",
+    },
+    {
+      heading: "2. Allocated to this package",
+      columns: ["Source", "Quoted from the drawing", "Severity"],
+      rows: allocated.map((i) => [
+        drawingWithRevision(byId.get(i.drawing_id)),
+        i.raw_text,
+        SEVERITY_LABEL[i.severity ?? "low"] ?? "Low",
+      ]),
+      emptyMessage: "Nothing on these drawings is clearly allocated to this package.",
+    },
+    {
+      heading: "3. Deferrals that may fall to this package — confirm",
+      note: "These are not allocated to this package. They are deferrals close enough to it that they must be confirmed before tender.",
+      columns: ["Severity", "Quoted from the drawing", "Source", "Deferred to", "Why it is listed", "Action"],
+      rows: maybe.map(({ item: i, why }) => [
+        SEVERITY_LABEL[i.severity ?? "low"] ?? "Low",
+        i.raw_text,
+        drawingWithRevision(byId.get(i.drawing_id)),
+        i.deferred_to ?? "Not named on the drawing",
+        why,
+        "May fall to this package — confirm",
+      ]),
+      emptyMessage: "No deferrals sit close to this package on these drawings.",
+    },
+    {
+      heading: "4. Parties this package depends on",
+      columns: ["Party", "Type", "Appointment status", "Items involving this package"],
+      rows: partyRows,
+      emptyMessage: "No party is named on any item touching this package.",
+    },
+    {
+      heading: "5. Drawings covered",
+      columns: ["Drawing", "Revision", "Title", "What could be read"],
+      rows: base.drawings.map((d) => [
+        drawingLabel(d),
+        d.revision ?? "Not stated",
+        d.title ?? "No title read",
+        TRIAGE_LABEL[d.triage_class ?? ""] ?? "Not classified",
+      ]),
+      emptyMessage: "No drawings in this scope.",
+    },
+  ];
+
+  const unconfirmed = (input.parties ?? []).filter(
+    (p) => partyIds.has(p.id) && p.appointed_status !== "yes",
+  );
+  const headline = [
+    `${contested.length} contested item${contested.length === 1 ? "" : "s"} name this package, ${allocated.length} item${
+      allocated.length === 1 ? "" : "s"
+    } are clearly allocated to it and ${maybe.length} deferral${maybe.length === 1 ? "" : "s"} may fall to it.`,
+    unconfirmed.length
+      ? `${unconfirmed.length} of the parties it depends on ${unconfirmed.length === 1 ? "is" : "are"} not confirmed as appointed: ${unconfirmed
+          .map((p) => p.canonical_name)
+          .join(", ")}.`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return {
+    ...base,
+    title: `Package scope gap report — ${trade.name}${trade.code ? ` (${trade.code})` : ""} — ${input.scopeLabel}`,
+    headline,
+    columns: sections[0]!.columns,
+    rows: sections.flatMap((s) => s.rows),
+    emptyMessage: "Nothing on these drawings touches this package.",
+    sections,
+  };
+}
