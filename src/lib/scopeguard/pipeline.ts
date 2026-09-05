@@ -145,7 +145,14 @@ const ANNOTATION_ONLY: RegExp[] = [
   // Location labels: street names and site boundaries name a place, not scope.
   /^[a-z][a-z'\s-]*\s(street|road|lane|avenue|way|place|square|gardens|drive|close|court|row|terrace|mews|yard|park|hill|crescent|walk|wharf|embankment)$/i,
   /^(site\s+|red\s?line\s+|party\s?wall\s+|building\s+)?(boundary|line)$/i,
+  // View and section labels: "Elevation view on top connection", "Plan view on
+  // base connection", "Section A-A", "Detail 3", "View on grid 4". Names which
+  // drawn view you are looking at, not scope.
+  /^(enlarged\s+|part\s+|typical\s+|indicative\s+)?(plan|section|elevation|detail|isometric|axonometric|3d)?\s*(view|section|detail|elevation|plan)\s+(on|at|through|of|looking)\b.*$/i,
+  /^(section|detail|elevation|plan|view)\s*[-–]?\s*[a-z0-9]{1,3}\s*[-–]?\s*[a-z0-9]{0,3}$/i,
+  /^(scale\s*bar|scale\s*[:=]?\s*\d+\s*[:/]\s*\d+|\d+\s*[:/]\s*\d+\s*(@|at)\s*a[0-4])$/i,
 ];
+
 
 
 export function isAnnotationOnly(text: string): boolean {
